@@ -7,6 +7,11 @@ import DungeonMapScene from './scenes/DungeonMapScene';
 /**
  * Phaser game configuration
  * Sets up the game instance with scenes, dimensions, and renderer settings
+ *
+ * ⚠️ TEMPORARY DEBUG MODE ⚠️
+ * DungeonMapScene is set as the default start scene for debugging level positions.
+ * TODO: REVERT TO ORIGINAL - Change scene order back to:
+ *   scene: [MainScene, BottomNavScene, LoadingScene, DungeonMapScene]
  */
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO, // Use WebGL if available, fallback to Canvas
@@ -15,10 +20,11 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'game-container', // DOM element ID where the game canvas will be inserted
   backgroundColor: '#FDF6E3', // Match primary-bg color from Tailwind config
   scene: [
-    MainScene, // Default starting scene - displays room background
+    // ⚠️ DEBUG MODE: Starting with DungeonMapScene
+    MainScene, // ORIGINAL: Default starting scene - displays room background
     BottomNavScene, // UI overlay scene - will be launched by MainScene
     LoadingScene, // Loading scene for dungeon transitions
-    DungeonMapScene, // Dungeon map scene with level selection
+    DungeonMapScene, // TEMP: Default starting scene for debugging positions
   ],
   physics: {
     default: 'arcade', // Use Arcade physics for simple 2D physics

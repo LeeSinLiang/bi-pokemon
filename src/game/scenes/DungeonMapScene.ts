@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { LEVEL_POSITIONS, LevelPosition } from '../config/dungeonLevelPositions';
+import { LEVEL_POSITIONS, LevelPosition } from '../data/dungeonLevelPositions';
 
 /**
  * DungeonMapScene - Scrollable dungeon map with level nodes
@@ -65,12 +65,32 @@ export default class DungeonMapScene extends Phaser.Scene {
     // Set camera bounds to match scaled background
     this.cameras.main.setBounds(0, 0, this.GAME_WIDTH, scaledBgHeight);
 
-    // Start camera at BOTTOM showing level 1 (treehouse at top)
-    // Position camera to show the top portion (treehouse area)
-    this.cameras.main.scrollY = 0; // Start at top showing treehouse
+    // Start camera at top to show full background
+    this.cameras.main.scrollY = 0;
 
-    // Create level nodes
+    // Create level nodes first (so we can calculate positions)
     this.createLevelNodes(bgScale);
+
+    // Smooth scroll to level 1 position with animation
+    const level1Pos = LEVEL_POSITIONS.find(pos => pos.level === 1);
+    if (level1Pos) {
+      const scaledLevel1Y = level1Pos.y * bgScale;
+      const gapFromTop = 100; // 100px gap from top edge
+      const targetScrollY = Math.max(0, scaledLevel1Y - gapFromTop);
+
+      // Wait 500ms to show background, then smoothly scroll to level 1
+      this.time.delayedCall(500, () => {
+        this.tweens.add({
+          targets: this.cameras.main,
+          scrollY: targetScrollY,
+          duration: 1500, // 1.5 seconds smooth scroll
+          ease: 'Power2',
+          onComplete: () => {
+            console.log(`Scrolled to Level 1 at Y: ${targetScrollY}`);
+          }
+        });
+      });
+    }
 
     // Create back button (fixed to camera)
     this.createBackButton();
@@ -96,35 +116,37 @@ export default class DungeonMapScene extends Phaser.Scene {
       const container = this.add.container(scaledX, scaledY);
 
       // Add node frame background (302x285 original - scale to ~70px)
-      const frame = this.add.image(0, 0, 'node-frame');
-      frame.setScale(0.23); // 302 * 0.23 ≈ 70px
-      container.add(frame);
+	  if (levelPos.level < 9) {
+		const frame = this.add.image(0, 0, 'node-frame');
+		frame.setScale(0.35);
+		container.add(frame);
+	  }
 
       // Add appropriate icon based on level and lock status
       let icon: Phaser.GameObjects.Image;
       if (levelPos.level === 1) {
         icon = this.add.image(0, 0, 'level-1-icon');
-        icon.setScale(0.11); // 500 * 0.11 ≈ 55px
+        icon.setScale(0.2); // 500 * 0.11 ≈ 55px
       } else if (levelPos.level === 2) {
         icon = this.add.image(0, 0, 'level-2-icon');
-        icon.setScale(0.11); // 500 * 0.11 ≈ 55px
+        icon.setScale(0.085); // 500 * 0.11 ≈ 55px
       } else {
         // Levels 3-10: locked
         icon = this.add.image(0, 0, 'lock-icon');
-        icon.setScale(0.12); // Adjust for lock icon size
+        icon.setScale(0.08); // Adjust for lock icon size
       }
       container.add(icon);
 
-      // Add level number text (smaller and positioned below frame)
-      const levelText = this.add.text(0, 42, `${levelPos.level}`, {
+      // Add level name text (positioned below node frame)
+      const levelText = this.add.text(0, 45, levelPos.name, {
         fontFamily: 'Nunito, sans-serif',
-        fontSize: '12px',
+        fontSize: '10px',
         color: '#FFFFFF',
         fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 2
+        align: 'center',
+        wordWrap: { width: 80 }
       });
-      levelText.setOrigin(0.5, 0.5);
+      levelText.setOrigin(0.5, 0);
       container.add(levelText);
 
       // Make container interactive (smaller hit area)
@@ -134,11 +156,12 @@ export default class DungeonMapScene extends Phaser.Scene {
 
       // Add click handler
       container.on('pointerdown', () => {
+        const isLocked = levelPos.level > 2; // Levels 3-10 are locked
         console.log('=== Level Node Clicked ===');
         console.log(`Level: ${levelPos.level}`);
         console.log(`Name: ${levelPos.name}`);
         console.log(`Position: (${levelPos.x}, ${levelPos.y})`);
-        console.log(`Locked: ${levelPos.isLocked}`);
+        console.log(`Locked: ${isLocked}`);
         console.log('========================');
       });
 

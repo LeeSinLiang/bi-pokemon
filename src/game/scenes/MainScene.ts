@@ -13,8 +13,8 @@ export default class MainScene extends Phaser.Scene {
    * Preload assets required for the main scene
    */
   preload(): void {
-    // Load the room background image
-    this.load.image('room_bg', '/src/assets/room_bg.jpeg');
+    // Load the room background image from public/assets
+    this.load.image('room_bg', '/assets/room_bg.jpeg');
   }
 
   /**

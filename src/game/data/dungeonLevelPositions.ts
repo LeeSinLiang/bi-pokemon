@@ -20,70 +20,64 @@ export interface LevelPosition {
 }
 
 /**
- * Position data for all 10 dungeon levels
+ * Position data for all 8 dungeon levels
  * Positions are based on visual analysis of the dungeon_background.png
  * and correspond to the wooden plank platforms along the descending path.
  */
 export const LEVEL_POSITIONS: LevelPosition[] = [
   {
     level: 1,
-    x: 256,
-    y: 150,
+    x: 150,
+    y: 680,
     name: "Gummy Root Systems"
   },
   {
     level: 2,
-    x: 312,
-    y: 330,
+    x: 380,
+    y: 810,
     name: "Greasy Swamp"
   },
   {
     level: 3,
-    x: 200,
-    y: 510,
+    x: 150,
+    y: 940,
     name: "Salt Crystal Caves"
   },
   {
     level: 4,
-    x: 288,
-    y: 690,
+    x: 380,
+    y: 1070,
     name: "Soda Stream"
   },
   {
     level: 5,
-    x: 224,
-    y: 870,
+    x: 150,
+    y: 1200,
     name: "Moldy Pantry"
   },
   {
     level: 6,
-    x: 300,
-    y: 1050,
+    x: 380,
+    y: 1330,
     name: "Deep Fryer Volcano"
   },
   {
     level: 7,
-    x: 212,
-    y: 1230,
+    x: 150,
+    y: 1460,
     name: "Frozen Wasteland"
   },
   {
     level: 8,
-    x: 296,
-    y: 1410,
+    x: 380,
+    y: 1590,
     name: "Stale Plains"
   },
   {
-    level: 9,
-    x: 256,
-    y: 1590,
-    name: "Artificial Flavor Factory"
-  },
-  {
-    level: 10,
-    x: 256,
-    y: 1820,
-    name: "The Heart of the Tree"
+	level: 9,
+	x: 255,
+	y: 1920,
+	name: "Corrupted Depths"
   }
 ];
 
