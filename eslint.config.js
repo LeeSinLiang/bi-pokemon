@@ -36,4 +36,13 @@ export default defineConfig([
       }],
     },
   },
+  // Configuration for Node.js config files
+  {
+    files: ['vite.config.ts', 'vitest.config.ts', 'tailwind.config.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
 ])
