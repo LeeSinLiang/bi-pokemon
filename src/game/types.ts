@@ -296,3 +296,155 @@ export interface AnimationConfig {
   repeat?: number;
   yoyo?: boolean;
 }
+
+// ============================================================================
+// Battle System Types
+// ============================================================================
+
+// Nutritional types
+export type NutritionalType = 'PROTEIN' | 'CARB' | 'FAT' | 'FIBER' | 'PROCESSED';
+
+// Skill categories
+export type SkillCategory =
+  | 'PHYSICAL'    // Standard physical attack
+  | 'SPECIAL'     // Special attack (type-based)
+  | 'RANGED'      // Ranged attack
+  | 'BUFF'        // Buff own stats
+  | 'DEBUFF'      // Debuff enemy stats
+  | 'HEAL'        // Heal own HP
+  | 'UTILITY'     // Special utility (trap, protect, etc.)
+  | 'EVASIVE'     // Evasion boost
+  | 'ULTIMATE';   // Ultimate attack
+
+// Status effects
+export type StatusEffect =
+  | 'DEHYDRATED'  // 10% HP chip damage per turn (from Salt Spray)
+  | 'GREASED'     // Speed sharply lowered
+  | 'SOUR'        // Accuracy lowered
+  | 'SLEEP'       // Cannot act
+  | 'TRAPPED';    // Cannot swap
+
+// Stat modifications
+export type StatModifier = 'ATTACK' | 'DEFENSE' | 'SPEED' | 'ACCURACY' | 'EVASION';
+
+// Battle states
+export type BattleState =
+  | 'INTRO'           // Battle start animation
+  | 'PLAYER_TURN'     // Player selecting action
+  | 'ENEMY_TURN'      // Enemy AI deciding
+  | 'EXECUTING_MOVE'  // Move being executed
+  | 'APPLYING_EFFECTS' // Applying status/stat changes
+  | 'TURN_END'        // End of turn processing
+  | 'VICTORY'         // Player won
+  | 'DEFEAT'          // Player lost
+  | 'FLED';           // Player fled
+
+// Turn action types
+export type TurnActionType = 'SKILL' | 'FEED' | 'SWAP' | 'FLEE';
+
+export interface BattlePetSkill {
+  name: string;
+  category: SkillCategory;
+  type?: NutritionalType;      // Attack type for damage calculation
+  power?: number;              // Base damage (if applicable)
+  accuracy?: number;           // Hit chance 0-100
+  description: string;
+  effect?: {
+    statusEffect?: StatusEffect;
+    statusChance?: number;     // 0-100
+    statModifier?: StatModifier;
+    statChange?: number;       // 1 = +1 stage, -1 = -1 stage, 2 = ++, etc.
+    targetSelf?: boolean;      // If true, applies to user instead of target
+    multihit?: [number, number]; // [min, max] hits
+    recoil?: number;           // Recoil damage as % of damage dealt
+    healOnKO?: number;         // % of max HP to heal if this KOs target
+    bonusAgainstType?: NutritionalType; // Deals extra damage to this type
+  };
+}
+
+export interface BattlePetData {
+  id: string;
+  name: string;
+  visuals: string;
+  personality: string;
+  types: NutritionalType[];
+  spriteKey: string;           // Phaser sprite key
+  baseStats: {
+    maxHP: number;
+    attack: number;
+    defense: number;
+    speed: number;
+  };
+  skills: BattlePetSkill[];
+  passiveAbility?: {
+    name: string;
+    effect: string;
+  };
+}
+
+export interface BattleBossData {
+  id: string;
+  name: string;
+  locationLevel: number;
+  locationName: string;
+  visuals: string;
+  archetype: string;
+  types: NutritionalType[];
+  spriteKey: string;
+  damagedSpriteKey?: string;   // Sprite when HP < 50%
+  baseStats: {
+    maxHP: number;
+    attack: number;
+    defense: number;
+    speed: number;
+  };
+  passiveAbility?: {
+    name: string;
+    description: string;
+    effect?: any;              // Custom logic data
+  };
+  moveset: BattlePetSkill[];
+}
+
+export interface BattleCombatant {
+  id: string;
+  name: string;
+  types: NutritionalType[];
+  currentHP: number;
+  maxHP: number;
+  baseAttack: number;
+  baseDefense: number;
+  baseSpeed: number;
+  skills: BattlePetSkill[];
+  statusEffects: StatusEffect[];
+  statModifiers: Map<StatModifier, number>; // Stat stage changes (-6 to +6)
+  isPlayer: boolean;
+  sprite?: Phaser.GameObjects.Image;
+  passiveAbility?: any;
+}
+
+export interface TurnAction {
+  type: TurnActionType;
+  skill?: BattlePetSkill;
+  itemId?: string;
+  targetPetId?: string;
+}
+
+export interface BattleMessage {
+  text: string;
+  type: 'action' | 'damage' | 'effect' | 'status' | 'info';
+  timestamp: number;
+}
+
+export interface TypeMatchup {
+  superEffectiveAgainst: NutritionalType[];
+  notVeryEffectiveAgainst: NutritionalType[];
+  noEffectAgainst: NutritionalType[];
+}
+
+export interface BattleSceneData extends SceneData {
+  level: number;
+  levelName: string;
+  selectedPetId?: string;
+  playerPets?: BattlePetData[];
+}

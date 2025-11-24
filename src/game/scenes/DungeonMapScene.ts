@@ -149,9 +149,11 @@ export default class DungeonMapScene extends Phaser.Scene {
       levelText.setOrigin(0.5, 0);
       container.add(levelText);
 
-      // Make container interactive (smaller hit area)
-      const hitArea = new Phaser.Geom.Circle(0, 0, 35);
-      container.setSize(70, 70);
+      // Make container interactive with larger hit area to cover frame and icon
+      // Frame is ~106px, using 80px radius (160px diameter) for generous coverage
+      // Hit area is centered at (80, 80) because setSize makes (0,0) the top-left
+      container.setSize(160, 160);
+      const hitArea = new Phaser.Geom.Circle(80, 80, 80);
       container.setInteractive(hitArea, Phaser.Geom.Circle.Contains);
 
       // Add click handler
@@ -163,12 +165,25 @@ export default class DungeonMapScene extends Phaser.Scene {
         console.log(`Position: (${levelPos.x}, ${levelPos.y})`);
         console.log(`Locked: ${isLocked}`);
         console.log('========================');
+
+        // Launch battle for Level 2
+        if (levelPos.level === 2 && !isLocked) {
+          console.log('Launching Battle Scene for Level 2');
+          this.scene.start('BattleScene', {
+            level: levelPos.level,
+            levelName: levelPos.name,
+            previousScene: 'DungeonMapScene',
+          });
+        } else if (isLocked) {
+          console.log('Level is locked!');
+        }
       });
 
-      // Add hover effect
+      // Add hover effect - smooth scale animation
       container.on('pointerover', () => {
         this.input.setDefaultCursor('pointer');
-        container.setScale(1.1);
+        // Cancel any existing tweens on this container
+        this.tweens.killTweensOf(container);
         this.tweens.add({
           targets: container,
           scale: 1.15,
@@ -179,6 +194,8 @@ export default class DungeonMapScene extends Phaser.Scene {
 
       container.on('pointerout', () => {
         this.input.setDefaultCursor('default');
+        // Cancel any existing tweens on this container
+        this.tweens.killTweensOf(container);
         this.tweens.add({
           targets: container,
           scale: 1.0,

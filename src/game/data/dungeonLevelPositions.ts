@@ -40,37 +40,37 @@ export const LEVEL_POSITIONS: LevelPosition[] = [
   {
     level: 3,
     x: 150,
-    y: 940,
+    y: 950,
     name: "Salt Crystal Caves"
   },
   {
     level: 4,
     x: 380,
-    y: 1070,
+    y: 1060,
     name: "Soda Stream"
   },
   {
     level: 5,
     x: 150,
-    y: 1200,
+    y: 1250,
     name: "Moldy Pantry"
   },
   {
     level: 6,
     x: 380,
-    y: 1330,
+    y: 1400,
     name: "Deep Fryer Volcano"
   },
   {
     level: 7,
     x: 150,
-    y: 1460,
+    y: 1580,
     name: "Frozen Wasteland"
   },
   {
     level: 8,
     x: 380,
-    y: 1590,
+    y: 1700,
     name: "Stale Plains"
   },
   {
