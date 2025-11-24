@@ -31,6 +31,7 @@ import SkillCardUI from '../ui/SkillCardUI';
 import ActionButtonUI, { type ActionButtonType } from '../ui/ActionButtonUI';
 import MessageLogUI from '../ui/MessageLogUI';
 import BattleVFX from '../ui/BattleVFX';
+import SwapMenuUI from '../ui/SwapMenuUI';
 
 export default class BattleScene extends Phaser.Scene {
   // Scene data
@@ -40,6 +41,10 @@ export default class BattleScene extends Phaser.Scene {
   private battleState: BattleState = 'INTRO';
   private playerCombatant!: BattleCombatant;
   private enemyCombatant!: BattleCombatant;
+
+  // Party management
+  private playerParty: BattleCombatant[] = [];
+  private activePlayerIndex: number = 0;
 
   // UI Components
   private background!: Phaser.GameObjects.Image;
@@ -52,6 +57,7 @@ export default class BattleScene extends Phaser.Scene {
   private skillCards: SkillCardUI[] = [];
   private actionMenu!: Phaser.GameObjects.Container;
   private skillMenu!: Phaser.GameObjects.Container;
+  private swapMenu?: SwapMenuUI;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -125,40 +131,42 @@ export default class BattleScene extends Phaser.Scene {
    */
   private createBackground(): void {
     // Add battle arena background (9:16 aspect ratio - 400x711)
-    this.background = this.add.image(200, 425, 'battle-bg-level-2');
+    // Position at top (0 to 711) leaving 850-711=139px at bottom for UI
+    this.background = this.add.image(200, 355.5, 'battle-bg-level-2');
     this.background.setDisplaySize(400, 711);
-    // Center it vertically in the 850px viewport
-    this.background.setY(355);
   }
 
   /**
    * Initialize player and enemy combatants
    */
   private initializeCombatants(): void {
-    // Get player pet (default to Lemon Shark for demo, can be customized)
-    const selectedPetId = this.levelData.selectedPetId || 'LEMON_SHARK';
-    const petData = getBattlePet(selectedPetId);
+    // Load all 3 available pets into the party
+    const petIds = ['LEMON_SHARK', 'MUSUBEE', 'TARTLE'];
 
-    if (!petData) {
-      console.error('Failed to load pet data');
-      return;
-    }
+    petIds.forEach((petId) => {
+      const petData = getBattlePet(petId);
+      if (petData) {
+        const combatant: BattleCombatant = {
+          id: petData.id,
+          name: petData.name,
+          types: petData.types,
+          currentHP: petData.baseStats.maxHP,
+          maxHP: petData.baseStats.maxHP,
+          baseAttack: petData.baseStats.attack,
+          baseDefense: petData.baseStats.defense,
+          baseSpeed: petData.baseStats.speed,
+          skills: petData.skills,
+          statusEffects: [],
+          statModifiers: new Map(),
+          isPlayer: true,
+        };
+        this.playerParty.push(combatant);
+      }
+    });
 
-    // Create player combatant
-    this.playerCombatant = {
-      id: petData.id,
-      name: petData.name,
-      types: petData.types,
-      currentHP: petData.baseStats.maxHP,
-      maxHP: petData.baseStats.maxHP,
-      baseAttack: petData.baseStats.attack,
-      baseDefense: petData.baseStats.defense,
-      baseSpeed: petData.baseStats.speed,
-      skills: petData.skills,
-      statusEffects: [],
-      statModifiers: new Map(),
-      isPlayer: true,
-    };
+    // Set first pet as active
+    this.activePlayerIndex = 0;
+    this.playerCombatant = this.playerParty[this.activePlayerIndex];
 
     // Get boss data for Level 2
     const bossData = getBossByLevel(this.levelData.level);
@@ -250,16 +258,36 @@ export default class BattleScene extends Phaser.Scene {
    * Create action menu (Fight, Feed, Swap, Flee)
    */
   private createActionMenu(): void {
-    this.actionMenu = this.add.container(200, 750);
+    this.actionMenu = this.add.container(0, 0);
 
+    // Brown wood panel background (oak/grove theme)
+    // Starts at y=711 (where background ends) to y=850 (bottom)
+    const panelBg = this.add.graphics();
+    panelBg.fillStyle(0x5D4037, 1); // Dark brown
+    panelBg.fillRect(0, 711, 400, 139);
+
+    // Add wood grain texture effect with lighter brown stripes
+    panelBg.fillStyle(0x6D4C41, 0.3);
+    for (let i = 0; i < 14; i++) {
+      const y = 711 + (i * 10);
+      panelBg.fillRect(0, y, 400, 3);
+    }
+
+    // Top border
+    panelBg.lineStyle(3, 0x4E342E, 1);
+    panelBg.lineBetween(0, 711, 400, 711);
+
+    this.actionMenu.add(panelBg);
+
+    // Position buttons at bottom of panel
     const buttonSpacing = BATTLE_CONFIG.ACTION_BUTTON.WIDTH + 10;
-    const startX = -buttonSpacing * 1.5;
+    const startX = 200 - buttonSpacing * 1.5;
 
     // Fight button
     const fightBtn = new ActionButtonUI(
       this,
       startX,
-      0,
+      780, // 711 + 69
       'FIGHT',
       'Fight',
       () => this.onFightClicked()
@@ -271,7 +299,7 @@ export default class BattleScene extends Phaser.Scene {
     const feedBtn = new ActionButtonUI(
       this,
       startX + buttonSpacing,
-      0,
+      780,
       'FEED',
       'Feed',
       () => this.messageLog.addMessage('No items available!')
@@ -280,16 +308,15 @@ export default class BattleScene extends Phaser.Scene {
     this.actionButtons.push(feedBtn);
     this.actionMenu.add(feedBtn);
 
-    // Swap button (disabled for demo - single pet)
+    // Swap button
     const swapBtn = new ActionButtonUI(
       this,
       startX + buttonSpacing * 2,
-      0,
+      780,
       'SWAP',
       'Swap',
-      () => this.messageLog.addMessage('No other pets available!')
+      () => this.onSwapClicked()
     );
-    swapBtn.setDisabled(true);
     this.actionButtons.push(swapBtn);
     this.actionMenu.add(swapBtn);
 
@@ -297,7 +324,7 @@ export default class BattleScene extends Phaser.Scene {
     const fleeBtn = new ActionButtonUI(
       this,
       startX + buttonSpacing * 3,
-      0,
+      780,
       'FLEE',
       'Flee',
       () => this.onFleeClicked()
@@ -312,18 +339,37 @@ export default class BattleScene extends Phaser.Scene {
    * Create skill selection menu
    */
   private createSkillMenu(): void {
-    this.skillMenu = this.add.container(200, 750);
+    this.skillMenu = this.add.container(0, 0);
+
+    // Brown wood panel background (oak/grove theme)
+    // Starts at y=711 (where background ends) to y=850 (bottom)
+    const panelBg = this.add.graphics();
+    panelBg.fillStyle(0x5D4037, 1); // Dark brown
+    panelBg.fillRect(0, 711, 400, 139);
+
+    // Add wood grain texture effect with lighter brown stripes
+    panelBg.fillStyle(0x6D4C41, 0.3);
+    for (let i = 0; i < 14; i++) {
+      const y = 711 + (i * 10);
+      panelBg.fillRect(0, y, 400, 3);
+    }
+
+    // Top border
+    panelBg.lineStyle(3, 0x4E342E, 1);
+    panelBg.lineBetween(0, 711, 400, 711);
+
+    this.skillMenu.add(panelBg);
 
     const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + 10;
     const numSkills = this.playerCombatant.skills.length;
-    const startX = -(cardSpacing * (numSkills - 1)) / 2;
+    const startX = 200 - (cardSpacing * (numSkills - 1)) / 2;
 
-    // Create skill cards
+    // Create skill cards - positioned on brown panel
     this.playerCombatant.skills.forEach((skill, index) => {
       const card = new SkillCardUI(
         this,
         startX + cardSpacing * index,
-        0,
+        745, // 711 + 34
         skill,
         () => this.onSkillSelected(skill)
       );
@@ -331,11 +377,11 @@ export default class BattleScene extends Phaser.Scene {
       this.skillMenu.add(card);
     });
 
-    // Back button
+    // Back button - at bottom
     const backBtn = new ActionButtonUI(
       this,
-      0,
-      50,
+      200,
+      815, // 711 + 104 (leaving 35px at bottom)
       'FLEE',
       'Back',
       () => this.showActionMenu()
@@ -431,6 +477,229 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     this.showSkillMenu();
+  }
+
+  /**
+   * Handle Swap button clicked
+   */
+  private onSwapClicked(): void {
+    // Check if trapped
+    if (this.playerCombatant.statusEffects.includes('TRAPPED')) {
+      this.messageLog.addMessage(
+        `${this.playerCombatant.name} is trapped and cannot swap!`,
+        'status'
+      );
+      return;
+    }
+
+    this.showSwapMenu();
+  }
+
+  /**
+   * Show swap menu
+   */
+  private showSwapMenu(): void {
+    this.actionMenu.setVisible(false);
+    this.skillMenu.setVisible(false);
+
+    // Create swap menu with party data
+    const petSlots = this.playerParty.map((combatant, index) => ({
+      combatant,
+      isActive: index === this.activePlayerIndex,
+      isFainted: combatant.currentHP === 0,
+    }));
+
+    this.swapMenu = new SwapMenuUI(
+      this,
+      200,
+      780,
+      petSlots,
+      (selectedCombatant) => this.onPetSwapSelected(selectedCombatant),
+      () => this.hideSwapMenu()
+    );
+  }
+
+  /**
+   * Hide swap menu
+   */
+  private hideSwapMenu(): void {
+    if (this.swapMenu) {
+      this.swapMenu.destroy();
+      this.swapMenu = undefined;
+    }
+    this.showActionMenu();
+  }
+
+  /**
+   * Handle pet swap selection
+   */
+  private async onPetSwapSelected(newCombatant: BattleCombatant): Promise<void> {
+    // Find index of selected pet
+    const newIndex = this.playerParty.findIndex((pet) => pet.id === newCombatant.id);
+    if (newIndex === -1 || newIndex === this.activePlayerIndex) {
+      return;
+    }
+
+    // Hide swap menu
+    if (this.swapMenu) {
+      this.swapMenu.destroy();
+      this.swapMenu = undefined;
+    }
+
+    // Perform the swap with animation
+    await this.performSwap(newIndex);
+
+    // Enemy attacks after swap (swap takes a turn)
+    if (this.enemyCombatant.currentHP > 0) {
+      await this.delay(1000);
+      const enemySkill =
+        this.enemyCombatant.skills[
+          Math.floor(Math.random() * this.enemyCombatant.skills.length)
+        ];
+      await this.executeSkill(this.enemyCombatant, this.playerCombatant, enemySkill);
+
+      // Check for battle end
+      if (this.checkBattleEnd()) {
+        return;
+      }
+
+      // Process end of turn
+      await this.processEndOfTurn();
+
+      if (this.checkBattleEnd()) {
+        return;
+      }
+    }
+
+    // Start next turn
+    this.startPlayerTurn();
+  }
+
+  /**
+   * Perform swap animation (Pokemon-style)
+   */
+  private async performSwap(newIndex: number): Promise<void> {
+    const oldCombatant = this.playerCombatant;
+    const newCombatant = this.playerParty[newIndex];
+
+    this.messageLog.addMessage(
+      `Come back, ${oldCombatant.name}!`,
+      'action'
+    );
+
+    // Animate old pet sliding out to the left
+    await new Promise<void>((resolve) => {
+      this.tweens.add({
+        targets: oldCombatant.sprite,
+        x: -100,
+        alpha: 0,
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => resolve(),
+      });
+    });
+
+    await this.delay(500);
+
+    // Update active pet
+    this.activePlayerIndex = newIndex;
+    this.playerCombatant = newCombatant;
+
+    // Update sprite
+    const newSpriteKey = BATTLE_PETS[
+      newCombatant.id.toUpperCase().replace('PET_', '')
+    ].spriteKey;
+
+    // Create new sprite off-screen left
+    const newSprite = this.add.image(
+      -100,
+      BATTLE_CONFIG.POSITIONS.PLAYER.Y,
+      newSpriteKey
+    );
+    newSprite.setScale(0.3);
+    newSprite.setAlpha(0);
+
+    // Remove old sprite
+    if (oldCombatant.sprite) {
+      oldCombatant.sprite.destroy();
+    }
+
+    // Assign new sprite
+    newCombatant.sprite = newSprite;
+
+    // Update health bar
+    this.playerHealthBar.destroy();
+    this.playerHealthBar = new HealthBarUI(
+      this,
+      BATTLE_CONFIG.POSITIONS.PLAYER.X,
+      BATTLE_CONFIG.POSITIONS.PLAYER.Y + 80,
+      newCombatant.name,
+      newCombatant.currentHP,
+      newCombatant.maxHP
+    );
+
+    // Update skill cards
+    this.skillCards.forEach((card) => card.destroy());
+    this.skillCards = [];
+    this.skillMenu.removeAll(true);
+
+    // Recreate skill menu with new pet's skills
+    const panelBg = this.add.graphics();
+    panelBg.fillStyle(0x5D4037, 1);
+    panelBg.fillRect(0, 711, 400, 139);
+    panelBg.fillStyle(0x6D4C41, 0.3);
+    for (let i = 0; i < 14; i++) {
+      const y = 711 + (i * 10);
+      panelBg.fillRect(0, y, 400, 3);
+    }
+    panelBg.lineStyle(3, 0x4E342E, 1);
+    panelBg.lineBetween(0, 711, 400, 711);
+    this.skillMenu.add(panelBg);
+
+    const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + 10;
+    const numSkills = newCombatant.skills.length;
+    const startX = 200 - (cardSpacing * (numSkills - 1)) / 2;
+
+    newCombatant.skills.forEach((skill, index) => {
+      const card = new SkillCardUI(
+        this,
+        startX + cardSpacing * index,
+        745,
+        skill,
+        () => this.onSkillSelected(skill)
+      );
+      this.skillCards.push(card);
+      this.skillMenu.add(card);
+    });
+
+    const backBtn = new ActionButtonUI(
+      this,
+      200,
+      815,
+      'FLEE',
+      'Back',
+      () => this.showActionMenu()
+    );
+    this.skillMenu.add(backBtn);
+
+    this.messageLog.addMessage(
+      `Go! ${newCombatant.name}!`,
+      'action'
+    );
+
+    // Animate new pet sliding in from the left
+    await new Promise<void>((resolve) => {
+      this.tweens.add({
+        targets: newSprite,
+        x: BATTLE_CONFIG.POSITIONS.PLAYER.X,
+        alpha: 1,
+        duration: 500,
+        ease: 'Power2',
+        onComplete: () => resolve(),
+      });
+    });
+
+    await this.delay(500);
   }
 
   /**

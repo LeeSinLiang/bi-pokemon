@@ -9,17 +9,10 @@ import { BATTLE_CONFIG } from '../data/battleConfig';
 export type ActionButtonType = 'FIGHT' | 'FEED' | 'SWAP' | 'FLEE';
 
 const BUTTON_COLORS: Record<ActionButtonType, { normal: number; hover: number }> = {
-  FIGHT: { normal: 0xE57373, hover: 0xEF5350 }, // Red
-  FEED: { normal: 0x81C784, hover: 0x66BB6A },  // Green
-  SWAP: { normal: 0x64B5F6, hover: 0x42A5F5 },  // Blue
-  FLEE: { normal: 0x9575CD, hover: 0x7E57C2 },  // Purple
-};
-
-const BUTTON_ICONS: Record<ActionButtonType, string> = {
-  FIGHT: '⚔️',
-  FEED: '🍎',
-  SWAP: '↔️',
-  FLEE: '💨',
+  FIGHT: { normal: 0xF9D71C, hover: 0xFDD835 }, // Yellow/Gold
+  FEED: { normal: 0x9E9E9E, hover: 0xBDBDBD },  // Gray
+  SWAP: { normal: 0x64B5F6, hover: 0x42A5F5 },  // Light Blue
+  FLEE: { normal: 0xE57373, hover: 0xEF5350 },  // Red
 };
 
 export default class ActionButtonUI extends Phaser.GameObjects.Container {
@@ -56,27 +49,20 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
     this.drawBackground(false);
     this.add(this.bg);
 
-    // Icon
-    const icon = this.scene.add.text(
-      -config.WIDTH / 2 + 12,
-      0,
-      BUTTON_ICONS[this.buttonType],
-      {
-        fontSize: '18px',
-      }
-    );
-    icon.setOrigin(0, 0.5);
-    this.add(icon);
-
-    // Label text
-    const labelText = this.scene.add.text(-8, 0, this.label, {
-      fontFamily: 'Nunito, sans-serif',
-      fontSize: config.FONT_SIZE,
+    // Label text (centered, uppercase, bold)
+    const labelText = this.scene.add.text(0, 0, this.label.toUpperCase(), {
+      fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif',
+      fontSize: '15px',
       color: '#FFFFFF',
       fontStyle: 'bold',
       align: 'center',
     });
-    labelText.setOrigin(0, 0.5);
+    labelText.setOrigin(0.5, 0.5);
+
+    // Add subtle shadow for readability (thinner stroke)
+    labelText.setStroke('#000000', 2);
+    labelText.setShadow(1, 1, '#000000', 2, false, true);
+
     this.add(labelText);
   }
 
@@ -102,17 +88,17 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
       -config.HEIGHT / 2,
       config.WIDTH,
       config.HEIGHT,
-      12
+      8
     );
 
-    // Border
-    this.bg.lineStyle(2, 0xFFFFFF, isHovered ? 1 : 0.7);
+    // Border (subtle)
+    this.bg.lineStyle(2, 0x000000, isHovered ? 0.5 : 0.3);
     this.bg.strokeRoundedRect(
       -config.WIDTH / 2,
       -config.HEIGHT / 2,
       config.WIDTH,
       config.HEIGHT,
-      12
+      8
     );
   }
 
@@ -120,17 +106,22 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
     if (!this.onClick) return;
 
     const config = BATTLE_CONFIG.ACTION_BUTTON;
-    const hitArea = new Phaser.Geom.Rectangle(
-      -config.WIDTH / 2,
-      -config.HEIGHT / 2,
-      config.WIDTH,
-      config.HEIGHT
-    );
-    this.setSize(config.WIDTH, config.HEIGHT);
-    this.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
 
-    // Hover effects
-    this.on('pointerover', () => {
+    // Use a simple approach: create a transparent hit area sprite
+    const hitBox = this.scene.add.rectangle(
+      0,
+      0,
+      config.WIDTH,
+      config.HEIGHT,
+      0x000000,
+      0.01
+    );
+    hitBox.setInteractive({ useHandCursor: true });
+    this.add(hitBox);
+    this.sendToBack(hitBox);
+
+    // Hover effects on hitBox
+    hitBox.on('pointerover', () => {
       if (!this.isDisabled) {
         this.scene.input.setDefaultCursor('pointer');
         this.drawBackground(true);
@@ -143,7 +134,7 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
       }
     });
 
-    this.on('pointerout', () => {
+    hitBox.on('pointerout', () => {
       this.scene.input.setDefaultCursor('default');
       this.drawBackground(false);
       this.scene.tweens.add({
@@ -154,8 +145,8 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
       });
     });
 
-    // Click handler
-    this.on('pointerdown', () => {
+    // Click handler on hitBox
+    hitBox.on('pointerdown', () => {
       if (!this.isDisabled && this.onClick) {
         this.onClick();
       }

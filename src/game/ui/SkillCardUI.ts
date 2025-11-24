@@ -63,6 +63,8 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
       wordWrap: { width: config.WIDTH - 10 },
     });
     skillName.setOrigin(0.5, 0.5);
+    skillName.setStroke('#000000', 2);
+    skillName.setShadow(1, 1, '#000000', 1, false, true);
     this.add(skillName);
 
     // Category text
@@ -78,6 +80,7 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
       }
     );
     categoryText.setOrigin(0.5, 0.5);
+    categoryText.setStroke('#000000', 1);
     this.add(categoryText);
   }
 
@@ -129,17 +132,22 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
     if (!this.onClick) return;
 
     const config = BATTLE_CONFIG.SKILL_CARD;
-    const hitArea = new Phaser.Geom.Rectangle(
-      -config.WIDTH / 2,
-      -config.HEIGHT / 2,
-      config.WIDTH,
-      config.HEIGHT
-    );
-    this.setSize(config.WIDTH, config.HEIGHT);
-    this.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
 
-    // Hover effects
-    this.on('pointerover', () => {
+    // Use a simple approach: create a transparent hit area sprite
+    const hitBox = this.scene.add.rectangle(
+      0,
+      0,
+      config.WIDTH,
+      config.HEIGHT,
+      0x000000,
+      0.01
+    );
+    hitBox.setInteractive({ useHandCursor: true });
+    this.add(hitBox);
+    this.sendToBack(hitBox);
+
+    // Hover effects on hitBox
+    hitBox.on('pointerover', () => {
       if (!this.isDisabled) {
         this.scene.input.setDefaultCursor('pointer');
         this.drawBackground(true);
@@ -152,7 +160,7 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
       }
     });
 
-    this.on('pointerout', () => {
+    hitBox.on('pointerout', () => {
       this.scene.input.setDefaultCursor('default');
       this.drawBackground(false);
       this.scene.tweens.add({
@@ -163,8 +171,8 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
       });
     });
 
-    // Click handler
-    this.on('pointerdown', () => {
+    // Click handler on hitBox
+    hitBox.on('pointerdown', () => {
       if (!this.isDisabled && this.onClick) {
         this.onClick();
       }

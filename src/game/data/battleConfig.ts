@@ -95,8 +95,8 @@ export const BATTLE_CONFIG = {
   // Action button UI
   ACTION_BUTTON: {
     WIDTH: 90,
-    HEIGHT: 40,
-    FONT_SIZE: '14px',
+    HEIGHT: 36,
+    FONT_SIZE: '16px',
   },
 
   // Message log
