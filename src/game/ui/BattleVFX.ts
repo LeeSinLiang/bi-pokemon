@@ -5,6 +5,7 @@
 
 import Phaser from 'phaser';
 import type { SkillCategory } from '../types';
+import { createSharpText } from '../utils/textUtils';
 
 export default class BattleVFX {
   private scene: Phaser.Scene;
@@ -23,7 +24,7 @@ export default class BattleVFX {
     isCritical: boolean = false,
     isSuperEffective: boolean = false
   ): void {
-    const damageText = this.scene.add.text(x, y, `-${Math.ceil(damage)}`, {
+    const damageText = createSharpText(this.scene, x, y, `-${Math.ceil(damage)}`, {
       fontFamily: 'Nunito, sans-serif',
       fontSize: isCritical ? '32px' : '24px',
       color: isCritical ? '#FFD700' : '#FFFFFF',
@@ -35,7 +36,7 @@ export default class BattleVFX {
 
     // Add "CRITICAL!" text if critical hit
     if (isCritical) {
-      const critText = this.scene.add.text(x, y - 30, 'CRITICAL!', {
+      const critText = createSharpText(this.scene, x, y - 30, 'CRITICAL!', {
         fontFamily: 'Nunito, sans-serif',
         fontSize: '14px',
         color: '#FFD700',
@@ -57,7 +58,7 @@ export default class BattleVFX {
 
     // Add "Super Effective!" text
     if (isSuperEffective) {
-      const effectText = this.scene.add.text(x, y + 30, 'Super Effective!', {
+      const effectText = createSharpText(this.scene, x, y + 30, 'Super Effective!', {
         fontFamily: 'Nunito, sans-serif',
         fontSize: '12px',
         color: '#81C784',
@@ -92,7 +93,7 @@ export default class BattleVFX {
    * Show heal number popup
    */
   public showHealNumber(x: number, y: number, heal: number): void {
-    const healText = this.scene.add.text(x, y, `+${Math.ceil(heal)}`, {
+    const healText = createSharpText(this.scene, x, y, `+${Math.ceil(heal)}`, {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '24px',
       color: '#81C784',
@@ -205,12 +206,12 @@ export default class BattleVFX {
     statusIcon: string,
     statusName: string
   ): void {
-    const icon = this.scene.add.text(x, y, statusIcon, {
+    const icon = createSharpText(this.scene, x, y, statusIcon, {
       fontSize: '32px',
     });
     icon.setOrigin(0.5);
 
-    const nameText = this.scene.add.text(x, y + 30, statusName, {
+    const nameText = createSharpText(this.scene, x, y + 30, statusName, {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '12px',
       color: '#FFD54F',
@@ -254,7 +255,8 @@ export default class BattleVFX {
     const color = change > 0 ? '#81C784' : '#E57373';
     const stages = Math.abs(change) > 1 ? `${Math.abs(change)}x` : '';
 
-    const text = this.scene.add.text(
+    const text = createSharpText(
+      this.scene,
       x,
       y,
       `${statName} ${arrow}${stages}`,
@@ -285,7 +287,8 @@ export default class BattleVFX {
   public createBuffParticles(x: number, y: number): void {
     for (let i = 0; i < 5; i++) {
       this.scene.time.delayedCall(i * 100, () => {
-        const sparkle = this.scene.add.text(
+        const sparkle = createSharpText(
+          this.scene,
           x + (Math.random() - 0.5) * 40,
           y + (Math.random() - 0.5) * 40,
           '✨',
@@ -308,7 +311,7 @@ export default class BattleVFX {
    * Miss indicator
    */
   public showMiss(x: number, y: number): void {
-    const missText = this.scene.add.text(x, y, 'MISS!', {
+    const missText = createSharpText(this.scene, x, y, 'MISS!', {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '24px',
       color: '#9E9E9E',
@@ -332,7 +335,7 @@ export default class BattleVFX {
    * Evade indicator (for boss passive)
    */
   public showEvade(x: number, y: number): void {
-    const evadeText = this.scene.add.text(x, y, 'EVADED!', {
+    const evadeText = createSharpText(this.scene, x, y, 'EVADED!', {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '20px',
       color: '#64B5F6',

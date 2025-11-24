@@ -5,8 +5,9 @@
 
 import Phaser from 'phaser';
 import { BATTLE_CONFIG } from '../data/battleConfig';
-import { TYPE_COLORS, TYPE_ICONS } from '../data/typeChart';
+import { TYPE_COLORS } from '../data/typeChart';
 import type { BattlePetSkill, NutritionalType } from '../types';
+import { createSharpText } from '../utils/textUtils';
 
 export default class SkillCardUI extends Phaser.GameObjects.Container {
   private bg!: Phaser.GameObjects.Graphics;
@@ -39,48 +40,46 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
     this.drawBackground(false);
     this.add(this.bg);
 
-    // Type icon (if skill has a type)
-    if (this.skill.type) {
-      const typeIcon = this.scene.add.text(
-        -config.WIDTH / 2 + 8,
-        -config.HEIGHT / 2 + 6,
-        TYPE_ICONS[this.skill.type],
-        {
-          fontSize: '16px',
-        }
-      );
-      typeIcon.setOrigin(0, 0);
-      this.add(typeIcon);
-    }
-
     // Skill name
-    const skillName = this.scene.add.text(0, -8, this.skill.name, {
+    const skillName = createSharpText(this.scene, 0, 0, this.skill.name, {
       fontFamily: 'Nunito, sans-serif',
       fontSize: config.FONT_SIZE,
       color: '#FFFFFF',
       fontStyle: 'bold',
       align: 'center',
-      wordWrap: { width: config.WIDTH - 10 },
+      wordWrap: { width: config.WIDTH - 15 },
+      lineSpacing: -4, // Reduce spacing between lines when text wraps
     });
     skillName.setOrigin(0.5, 0.5);
-    skillName.setStroke('#000000', 2);
-    skillName.setShadow(1, 1, '#000000', 1, false, true);
-    this.add(skillName);
+    skillName.setStroke('#000000', 5);
+	this.add(skillName);
 
-    // Category text
-    const categoryText = this.scene.add.text(
+    // Get actual height of skill name text (accounts for word wrapping)
+    const skillNameHeight = skillName.height;
+
+    // Calculate vertical spacing to center both texts in the card
+    const totalContentHeight = skillNameHeight + 6; // 6px gap between texts
+    const topOffset = -totalContentHeight / 2;
+
+    // Reposition skill name to top of content area
+    skillName.y = topOffset + skillNameHeight / 2;
+
+    // Category text - positioned dynamically below skill name
+    const categoryY = skillName.y + skillNameHeight / 2 + 6; // 6px gap
+    const categoryText = createSharpText(
+      this.scene,
       0,
-      8,
+      categoryY,
       this.skill.category,
       {
         fontFamily: 'Nunito, sans-serif',
-        fontSize: '8px',
-        color: '#E0E0E0',
+        fontSize: config.CATEGORY_FONT_SIZE,
+        color: '#FFFFFF',
         align: 'center',
       }
     );
     categoryText.setOrigin(0.5, 0.5);
-    categoryText.setStroke('#000000', 1);
+    categoryText.setStroke('#000000', 3);
     this.add(categoryText);
   }
 
@@ -103,10 +102,10 @@ export default class SkillCardUI extends Phaser.GameObjects.Container {
       this.bg.fillStyle(0x424242, 0.5);
     } else if (isHovered) {
       // Hover state - lighter
-      this.bg.fillStyle(color, 0.9);
+      this.bg.fillStyle(color, 1);
     } else {
       // Normal state
-      this.bg.fillStyle(color, 0.7);
+      this.bg.fillStyle(color, 0.9);
     }
 
     this.bg.fillRoundedRect(

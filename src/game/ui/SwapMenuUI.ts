@@ -6,6 +6,7 @@
 import Phaser from 'phaser';
 import type { BattleCombatant } from '../types';
 import { TYPE_ICONS } from '../data/typeChart';
+import { createSharpText } from '../utils/textUtils';
 
 interface PetSlotData {
   combatant: BattleCombatant;
@@ -54,18 +55,6 @@ export default class SwapMenuUI extends Phaser.GameObjects.Container {
 
     this.add(panelBg);
 
-    // Title text
-    const titleText = this.scene.add.text(0, -50, 'Choose a pet to swap in:', {
-      fontFamily: 'Nunito, sans-serif',
-      fontSize: '12px',
-      color: '#FFFFFF',
-      fontStyle: 'bold',
-      align: 'center',
-    });
-    titleText.setOrigin(0.5);
-    titleText.setStroke('#000000', 2);
-    this.add(titleText);
-
     // Create pet slots (3 pets displayed horizontally)
     const slotWidth = 120;
     const slotSpacing = 10;
@@ -73,7 +62,7 @@ export default class SwapMenuUI extends Phaser.GameObjects.Container {
 
     pets.forEach((petData, index) => {
       const slotX = startX + (slotWidth + slotSpacing) * index + slotWidth / 2;
-      const slot = this.createPetSlot(petData, slotX, 10);
+      const slot = this.createPetSlot(petData, slotX, -10);
       this.petSlots.push(slot);
       this.add(slot);
     });
@@ -119,22 +108,22 @@ export default class SwapMenuUI extends Phaser.GameObjects.Container {
     slot.add(bg);
 
     // Pet name
-    const nameText = this.scene.add.text(0, -22, petData.combatant.name, {
+    const nameText = createSharpText(this.scene, 0, -22, petData.combatant.name, {
       fontFamily: 'Nunito, sans-serif',
-      fontSize: '11px',
+      fontSize: '15px',
       color: petData.isFainted ? '#9E9E9E' : '#FFFFFF',
       fontStyle: 'bold',
       align: 'center',
     });
     nameText.setOrigin(0.5);
-    nameText.setStroke('#000000', 2);
+    nameText.setStroke('#000000', 4);
     slot.add(nameText);
 
     // Type icons
     const typeIconsText = petData.combatant.types
       .map((type) => TYPE_ICONS[type])
       .join(' ');
-    const typeIcons = this.scene.add.text(0, -8, typeIconsText, {
+    const typeIcons = createSharpText(this.scene, 0, -8, typeIconsText, {
       fontSize: '12px',
     });
     typeIcons.setOrigin(0.5);
@@ -165,37 +154,38 @@ export default class SwapMenuUI extends Phaser.GameObjects.Container {
     slot.add(hpFill);
 
     // HP text
-    const hpText = this.scene.add.text(
+    const hpText = createSharpText(
+      this.scene,
       0,
       22,
       `HP: ${Math.ceil(petData.combatant.currentHP)}/${petData.combatant.maxHP}`,
       {
         fontFamily: 'Nunito, sans-serif',
-        fontSize: '9px',
-        color: petData.isFainted ? '#9E9E9E' : '#E0E0E0',
+        fontSize: '11px',
+        color: petData.isFainted ? '#9E9E9E' : '#FFFFFF',
         align: 'center',
       }
     );
     hpText.setOrigin(0.5);
-    hpText.setStroke('#000000', 1);
+    hpText.setStroke('#000000', 3);
     slot.add(hpText);
 
     // Status indicator for active pet
     if (petData.isActive) {
-      const activeLabel = this.scene.add.text(0, -35, '(Active)', {
+      const activeLabel = createSharpText(this.scene, 0, -35, '(Active)', {
         fontFamily: 'Nunito, sans-serif',
-        fontSize: '8px',
+        fontSize: '10px',
         color: '#81C784',
         fontStyle: 'bold',
       });
       activeLabel.setOrigin(0.5);
-      activeLabel.setStroke('#000000', 1);
+      activeLabel.setStroke('#000000', 3);
       slot.add(activeLabel);
     }
 
     // Fainted overlay
     if (petData.isFainted) {
-      const faintedText = this.scene.add.text(0, 0, 'FAINTED', {
+      const faintedText = createSharpText(this.scene, 0, 0, 'FAINTED', {
         fontFamily: 'Nunito, sans-serif',
         fontSize: '14px',
         color: '#E57373',
@@ -280,7 +270,7 @@ export default class SwapMenuUI extends Phaser.GameObjects.Container {
     button.add(bg);
 
     // Text
-    const text = this.scene.add.text(0, 0, 'BACK', {
+    const text = createSharpText(this.scene, 0, 0, 'BACK', {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '13px',
       color: '#FFFFFF',

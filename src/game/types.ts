@@ -348,6 +348,7 @@ export interface BattlePetSkill {
   type?: NutritionalType;      // Attack type for damage calculation
   power?: number;              // Base damage (if applicable)
   accuracy?: number;           // Hit chance 0-100
+  neverMiss?: boolean;         // If true, ignores all accuracy checks (like Pokemon's Swift)
   description: string;
   effect?: {
     statusEffect?: StatusEffect;

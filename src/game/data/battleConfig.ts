@@ -56,8 +56,8 @@ export const BATTLE_CONFIG = {
     },
     // Player pet position
     PLAYER: {
-      X: 100,  // Lower-left area
-      Y: 500,
+      X: 80,  // Lower-left area
+      Y: 600,
     },
   },
 
@@ -86,24 +86,26 @@ export const BATTLE_CONFIG = {
 
   // Skill card UI
   SKILL_CARD: {
-    WIDTH: 90,
-    HEIGHT: 50,
-    SPACING: 5,
-    FONT_SIZE: '10px',
+    WIDTH: 110,
+    HEIGHT: 70,
+    SPACING: 8,
+    FONT_SIZE: '16px',
+    CATEGORY_FONT_SIZE: '13px',
+    Y_POSITION: 750, // Vertical position of skill cards in battle
   },
 
   // Action button UI
   ACTION_BUTTON: {
-    WIDTH: 90,
-    HEIGHT: 36,
-    FONT_SIZE: '16px',
+    WIDTH: 110,
+    HEIGHT: 42,
+    FONT_SIZE: '18px',
   },
 
   // Message log
   MESSAGE_LOG: {
     MAX_MESSAGES: 3,
-    Y_POSITION: 350,
-    FONT_SIZE: '12px',
+    Y_POSITION: 400,
+    FONT_SIZE: '14px',
     LINE_HEIGHT: 20,
   },
 };

@@ -39,7 +39,8 @@ export const BATTLE_PETS: Record<string, BattlePetData> = {
         type: 'FIBER',
         power: 60,
         accuracy: 100,
-        description: 'Spits lemon juice. Deals extra damage if target is PROCESSED type.',
+        neverMiss: true, // Guaranteed hit like Swift
+        description: 'Spits lemon juice. Never misses! Deals extra damage if target is PROCESSED type.',
         effect: {
           bonusAgainstType: 'PROCESSED', // Extra 50% damage vs PROCESSED
         },
@@ -67,14 +68,15 @@ export const BATTLE_PETS: Record<string, BattlePetData> = {
         type: 'PROTEIN',
         power: 65,
         accuracy: 100,
-        description: 'Quick jab. High critical hit chance.',
+        neverMiss: true, // Fast, precise attack that never misses
+        description: 'Quick jab. Never misses! High critical hit chance.',
         // Note: High crit will be handled in battle logic (25% instead of 6.25%)
       },
       {
         name: 'Nori Bind',
         category: 'UTILITY',
         power: 40,
-        accuracy: 95,
+        accuracy: 90, // Lower accuracy since it's a binding move
         description: 'Wraps opponent in seaweed. Prevents swapping next turn.',
         effect: {
           statusEffect: 'TRAPPED',
@@ -101,6 +103,7 @@ export const BATTLE_PETS: Record<string, BattlePetData> = {
       {
         name: 'Crust Hunker',
         category: 'BUFF',
+        neverMiss: true, // Self-targeting buff always succeeds
         description: 'Withdraws into shell. Sharply raises own Defense.',
         effect: {
           statModifier: 'DEFENSE',
@@ -113,7 +116,7 @@ export const BATTLE_PETS: Record<string, BattlePetData> = {
         category: 'RANGED',
         type: 'FIBER',
         power: 35,
-        accuracy: 90,
+        accuracy: 85, // Multi-hit move has slightly lower accuracy
         description: 'Launches fruit. Hits 2-3 times randomly.',
         effect: {
           multihit: [2, 3],

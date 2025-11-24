@@ -25,6 +25,7 @@ import {
 import {
   calculateTypeMultiplier,
   getEffectivenessMessage,
+  getTypeAccuracyModifier,
 } from '../data/typeChart';
 import HealthBarUI from '../ui/HealthBarUI';
 import SkillCardUI from '../ui/SkillCardUI';
@@ -164,8 +165,8 @@ export default class BattleScene extends Phaser.Scene {
       }
     });
 
-    // Set first pet as active
-    this.activePlayerIndex = 0;
+    // Randomly select which pet starts first
+    this.activePlayerIndex = Math.floor(Math.random() * this.playerParty.length);
     this.playerCombatant = this.playerParty[this.activePlayerIndex];
 
     // Get boss data for Level 2
@@ -279,15 +280,18 @@ export default class BattleScene extends Phaser.Scene {
 
     this.actionMenu.add(panelBg);
 
-    // Position buttons at bottom of panel
-    const buttonSpacing = BATTLE_CONFIG.ACTION_BUTTON.WIDTH + 10;
-    const startX = 200 - buttonSpacing * 1.5;
+    // Position buttons in 2x2 grid
+    const buttonGap = 15; // Gap between buttons
+    const leftX = 200 - (BATTLE_CONFIG.ACTION_BUTTON.WIDTH / 2 + buttonGap / 2);
+    const rightX = 200 + (BATTLE_CONFIG.ACTION_BUTTON.WIDTH / 2 + buttonGap / 2);
+    const topY = 745;  // First row
+    const bottomY = 800; // Second row
 
-    // Fight button
+    // Row 1: Fight and Swap (most important actions)
     const fightBtn = new ActionButtonUI(
       this,
-      startX,
-      780, // 711 + 69
+      leftX,
+      topY,
       'FIGHT',
       'Fight',
       () => this.onFightClicked()
@@ -295,11 +299,22 @@ export default class BattleScene extends Phaser.Scene {
     this.actionButtons.push(fightBtn);
     this.actionMenu.add(fightBtn);
 
-    // Feed button (disabled for demo)
+    const swapBtn = new ActionButtonUI(
+      this,
+      rightX,
+      topY,
+      'SWAP',
+      'Swap',
+      () => this.onSwapClicked()
+    );
+    this.actionButtons.push(swapBtn);
+    this.actionMenu.add(swapBtn);
+
+    // Row 2: Feed and Flee
     const feedBtn = new ActionButtonUI(
       this,
-      startX + buttonSpacing,
-      780,
+      leftX,
+      bottomY,
       'FEED',
       'Feed',
       () => this.messageLog.addMessage('No items available!')
@@ -308,23 +323,10 @@ export default class BattleScene extends Phaser.Scene {
     this.actionButtons.push(feedBtn);
     this.actionMenu.add(feedBtn);
 
-    // Swap button
-    const swapBtn = new ActionButtonUI(
-      this,
-      startX + buttonSpacing * 2,
-      780,
-      'SWAP',
-      'Swap',
-      () => this.onSwapClicked()
-    );
-    this.actionButtons.push(swapBtn);
-    this.actionMenu.add(swapBtn);
-
-    // Flee button
     const fleeBtn = new ActionButtonUI(
       this,
-      startX + buttonSpacing * 3,
-      780,
+      rightX,
+      bottomY,
       'FLEE',
       'Flee',
       () => this.onFleeClicked()
@@ -360,7 +362,7 @@ export default class BattleScene extends Phaser.Scene {
 
     this.skillMenu.add(panelBg);
 
-    const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + 10;
+    const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + BATTLE_CONFIG.SKILL_CARD.SPACING;
     const numSkills = this.playerCombatant.skills.length;
     const startX = 200 - (cardSpacing * (numSkills - 1)) / 2;
 
@@ -369,7 +371,7 @@ export default class BattleScene extends Phaser.Scene {
       const card = new SkillCardUI(
         this,
         startX + cardSpacing * index,
-        745, // 711 + 34
+        BATTLE_CONFIG.SKILL_CARD.Y_POSITION,
         skill,
         () => this.onSkillSelected(skill)
       );
@@ -552,10 +554,7 @@ export default class BattleScene extends Phaser.Scene {
     // Enemy attacks after swap (swap takes a turn)
     if (this.enemyCombatant.currentHP > 0) {
       await this.delay(1000);
-      const enemySkill =
-        this.enemyCombatant.skills[
-          Math.floor(Math.random() * this.enemyCombatant.skills.length)
-        ];
+      const enemySkill = this.selectBossSkill();
       await this.executeSkill(this.enemyCombatant, this.playerCombatant, enemySkill);
 
       // Check for battle end
@@ -656,7 +655,7 @@ export default class BattleScene extends Phaser.Scene {
     panelBg.lineBetween(0, 711, 400, 711);
     this.skillMenu.add(panelBg);
 
-    const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + 10;
+    const cardSpacing = BATTLE_CONFIG.SKILL_CARD.WIDTH + BATTLE_CONFIG.SKILL_CARD.SPACING;
     const numSkills = newCombatant.skills.length;
     const startX = 200 - (cardSpacing * (numSkills - 1)) / 2;
 
@@ -664,7 +663,7 @@ export default class BattleScene extends Phaser.Scene {
       const card = new SkillCardUI(
         this,
         startX + cardSpacing * index,
-        745,
+        BATTLE_CONFIG.SKILL_CARD.Y_POSITION,
         skill,
         () => this.onSkillSelected(skill)
       );
@@ -700,6 +699,99 @@ export default class BattleScene extends Phaser.Scene {
     });
 
     await this.delay(500);
+  }
+
+  /**
+   * Smart AI: Select best boss skill based on battle state
+   */
+  private selectBossSkill(): BattlePetSkill {
+    const skills = this.enemyCombatant.skills;
+    const player = this.playerCombatant;
+    const boss = this.enemyCombatant;
+
+    // Calculate player HP percentage
+    const playerHPPercent = player.currentHP / player.maxHP;
+    const bossHPPercent = boss.currentHP / boss.maxHP;
+
+    // Find specific move types
+    const ultimateMove = skills.find((s) => s.category === 'ULTIMATE');
+    const statusMoves = skills.filter(
+      (s) => s.effect?.statusEffect && s.effect?.statusChance
+    );
+    const damageMove = skills.find(
+      (s) => s.power && s.category !== 'ULTIMATE'
+    );
+
+    // Strategy 1: If player is low HP and we have ultimate, estimate if it can KO
+    if (ultimateMove && playerHPPercent <= 0.4) {
+      // Calculate rough damage estimate
+      const attackStage = boss.statModifiers.get('ATTACK') || 0;
+      const defenseStage = player.statModifiers.get('DEFENSE') || 0;
+      const attack = boss.baseAttack * getStatMultiplier(attackStage);
+      const defense = player.baseDefense * getStatMultiplier(defenseStage);
+
+      // Rough damage calculation (simplified)
+      const typeMultiplier = ultimateMove.type
+        ? calculateTypeMultiplier(ultimateMove.type, player.types)
+        : 1.0;
+      const estimatedDamage = calculateDamage(
+        attack,
+        defense,
+        ultimateMove.power || 100,
+        typeMultiplier,
+        false
+      );
+
+      // Use ultimate if it can potentially KO (with some safety margin)
+      if (estimatedDamage >= player.currentHP * 0.8) {
+        console.log('Boss AI: Using ultimate for potential KO');
+        return ultimateMove;
+      }
+    }
+
+    // Strategy 2: Apply status effects if player doesn't have them yet
+    for (const statusMove of statusMoves) {
+      const statusEffect = statusMove.effect?.statusEffect;
+      if (statusEffect && !player.statusEffects.includes(statusEffect)) {
+        // Prioritize high-chance status moves
+        const chance = statusMove.effect?.statusChance || 0;
+        if (chance >= 70 || Math.random() < 0.7) {
+          console.log(`Boss AI: Applying ${statusEffect} status`);
+          return statusMove;
+        }
+      }
+    }
+
+    // Strategy 3: Boss is low on HP, be more aggressive
+    if (bossHPPercent <= 0.3 && ultimateMove) {
+      console.log('Boss AI: Using ultimate while low HP (desperate)');
+      return ultimateMove;
+    }
+
+    // Strategy 4: Mix between damage moves and ultimate (weighted by HP)
+    const availableMoves: BattlePetSkill[] = [];
+
+    // Add damage moves (always available)
+    if (damageMove) {
+      availableMoves.push(damageMove);
+    }
+
+    // Add ultimate with increasing probability as player HP decreases
+    if (ultimateMove && Math.random() < (1 - playerHPPercent) * 0.5) {
+      availableMoves.push(ultimateMove);
+      availableMoves.push(ultimateMove); // Add twice for higher weight
+    }
+
+    // If we have moves, pick randomly from available
+    if (availableMoves.length > 0) {
+      const selected = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+      console.log(`Boss AI: Using ${selected.name} (mixed strategy)`);
+      return selected;
+    }
+
+    // Fallback: Random selection
+    console.log('Boss AI: Using random fallback');
+    return skills[Math.floor(Math.random() * skills.length)];
   }
 
   /**
@@ -739,11 +831,8 @@ export default class BattleScene extends Phaser.Scene {
       this.enemyCombatant.baseSpeed *
       getStatMultiplier(this.enemyCombatant.statModifiers.get('SPEED') || 0);
 
-    // Choose random enemy skill
-    const enemySkill =
-      this.enemyCombatant.skills[
-        Math.floor(Math.random() * this.enemyCombatant.skills.length)
-      ];
+    // Choose enemy skill using smart AI
+    const enemySkill = this.selectBossSkill();
 
     // Execute in speed order
     if (playerSpeed >= enemySpeed) {
@@ -798,15 +887,29 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
 
-    // Check accuracy
-    const accuracyStage = attacker.statModifiers.get('ACCURACY') || 0;
-    const evasionStage = defender.statModifiers.get('EVASION') || 0;
+    // Check accuracy (skip if move has neverMiss property)
+    if (!skill.neverMiss) {
+      const accuracyStage = attacker.statModifiers.get('ACCURACY') || 0;
+      const evasionStage = defender.statModifiers.get('EVASION') || 0;
 
-    if (!checkAccuracy(skill.accuracy || 100, accuracyStage, evasionStage)) {
-      this.messageLog.addMessage(`${attacker.name}'s attack missed!`, 'info');
-      this.vfx.showMiss(defender.sprite?.x || 0, defender.sprite?.y || 0);
-      await this.delay(1000);
-      return;
+      // Calculate type-based accuracy modifier (soft immunity)
+      const typeAccuracyMod = getTypeAccuracyModifier(skill.type, defender.types);
+      const finalAccuracy = (skill.accuracy || 100) * typeAccuracyMod;
+
+      if (!checkAccuracy(finalAccuracy, accuracyStage, evasionStage)) {
+        // Show special message for type-based misses
+        if (typeAccuracyMod < 1.0) {
+          this.messageLog.addMessage(
+            `${attacker.name}'s attack had trouble connecting!`,
+            'info'
+          );
+        } else {
+          this.messageLog.addMessage(`${attacker.name}'s attack missed!`, 'info');
+        }
+        this.vfx.showMiss(defender.sprite?.x || 0, defender.sprite?.y || 0);
+        await this.delay(1000);
+        return;
+      }
     }
 
     // Check boss passive (Slippery Scales)
@@ -957,8 +1060,8 @@ export default class BattleScene extends Phaser.Scene {
       await this.delay(1500);
     }
 
-    // Check if boss should switch to damaged sprite
-    if (!defender.isPlayer && defender.currentHP / defender.maxHP < 0.5) {
+    // Check if boss should switch to damaged sprite at 25% HP
+    if (!defender.isPlayer && defender.currentHP / defender.maxHP <= 0.25) {
       defender.sprite?.setTexture('boss-serpent-damage');
     }
   }

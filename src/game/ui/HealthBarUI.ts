@@ -5,6 +5,7 @@
 
 import Phaser from 'phaser';
 import { BATTLE_CONFIG, getHPBarColor } from '../data/battleConfig';
+import { createSharpText } from '../utils/textUtils';
 
 export default class HealthBarUI extends Phaser.GameObjects.Container {
   private background!: Phaser.GameObjects.Graphics;
@@ -41,7 +42,7 @@ export default class HealthBarUI extends Phaser.GameObjects.Container {
     const config = BATTLE_CONFIG.HP_BAR;
 
     // Name text above HP bar
-    this.nameText = this.scene.add.text(-config.WIDTH / 2, -25, name, {
+    this.nameText = createSharpText(this.scene, -config.WIDTH / 2, -25, name, {
       fontFamily: 'Nunito, sans-serif',
       fontSize: '12px',
       color: '#FFFFFF',
@@ -51,7 +52,8 @@ export default class HealthBarUI extends Phaser.GameObjects.Container {
     this.add(this.nameText);
 
     // HP text (HP: 100/100)
-    this.hpText = this.scene.add.text(
+    this.hpText = createSharpText(
+      this.scene,
       config.WIDTH / 2,
       -25,
       `HP: ${this.currentHP}/${this.maxHP}`,

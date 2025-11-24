@@ -39,7 +39,7 @@ export const BATTLE_BOSSES: Record<string, BattleBossData> = {
         category: 'PHYSICAL',
         type: 'FAT',
         power: 80,
-        accuracy: 95,
+        accuracy: 90, // Heavy physical attack has lower accuracy
         description:
           '30% chance to apply \'Greased\' status (Sharply lowers target Speed).',
         effect: {
@@ -53,7 +53,8 @@ export const BATTLE_BOSSES: Record<string, BattleBossData> = {
         type: 'PROCESSED',
         power: 60,
         accuracy: 100,
-        description: '100% chance to apply \'Dehydrated\' status.',
+        neverMiss: true, // Toxic spray that blankets the area - always hits
+        description: 'Toxic spray that never misses! 100% chance to apply \'Dehydrated\' status.',
         effect: {
           statusEffect: 'DEHYDRATED',
           statusChance: 100,
@@ -64,9 +65,9 @@ export const BATTLE_BOSSES: Record<string, BattleBossData> = {
         category: 'ULTIMATE',
         type: 'PROCESSED',
         power: 120,
-        accuracy: 90,
+        accuracy: 85, // Powerful but harder to land
         description:
-          'If this move knocks out a target, the user heals 20% of its max HP.',
+          'Powerful attack with lower accuracy. If this move knocks out a target, the user heals 20% of its max HP.',
         effect: {
           healOnKO: 20,
         },

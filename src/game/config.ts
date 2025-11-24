@@ -42,6 +42,7 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     pixelArt: false, // Set to true if using pixel art for crisp rendering
     antialias: true, // Smooth edges for non-pixel art
+    roundPixels: true, // Round pixel positions to prevent sub-pixel rendering blur
   },
 };
 

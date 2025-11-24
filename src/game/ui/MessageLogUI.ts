@@ -6,6 +6,7 @@
 import Phaser from 'phaser';
 import { BATTLE_CONFIG } from '../data/battleConfig';
 import type { BattleMessage } from '../types';
+import { createSharpText } from '../utils/textUtils';
 
 export default class MessageLogUI extends Phaser.GameObjects.Container {
   private messages: BattleMessage[] = [];
@@ -32,7 +33,8 @@ export default class MessageLogUI extends Phaser.GameObjects.Container {
 
     // Create text objects for messages
     for (let i = 0; i < config.MAX_MESSAGES; i++) {
-      const text = this.scene.add.text(
+      const text = createSharpText(
+        this.scene,
         -180,
         -30 + i * config.LINE_HEIGHT,
         '',

@@ -5,6 +5,7 @@
 
 import Phaser from 'phaser';
 import { BATTLE_CONFIG } from '../data/battleConfig';
+import { createSharpText } from '../utils/textUtils';
 
 export type ActionButtonType = 'FIGHT' | 'FEED' | 'SWAP' | 'FLEE';
 
@@ -50,18 +51,18 @@ export default class ActionButtonUI extends Phaser.GameObjects.Container {
     this.add(this.bg);
 
     // Label text (centered, uppercase, bold)
-    const labelText = this.scene.add.text(0, 0, this.label.toUpperCase(), {
-      fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif',
-      fontSize: '15px',
+    const labelText = createSharpText(this.scene, 0, 0, this.label.toUpperCase(), {
+      fontFamily: 'Nunito, sans-serif',
+      fontSize: '20px',
       color: '#FFFFFF',
       fontStyle: 'bold',
       align: 'center',
-    });
+    }, false);
     labelText.setOrigin(0.5, 0.5);
 
     // Add subtle shadow for readability (thinner stroke)
-    labelText.setStroke('#000000', 2);
-    labelText.setShadow(1, 1, '#000000', 2, false, true);
+    labelText.setStroke('#000000', 5);
+    // labelText.setShadow(1, 1, '#000000', 2, false, true);
 
     this.add(labelText);
   }

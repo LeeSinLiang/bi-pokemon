@@ -8,13 +8,13 @@ import type { NutritionalType, TypeMatchup } from '../types';
 export const TYPE_CHART: Record<NutritionalType, TypeMatchup> = {
   PROTEIN: {
     superEffectiveAgainst: ['CARB'],
-    notVeryEffectiveAgainst: ['FIBER'],
-    noEffectAgainst: ['FAT'],
+    notVeryEffectiveAgainst: ['FIBER', 'FAT'], // FAT changed from immune to resist
+    noEffectAgainst: [],
   },
   CARB: {
     superEffectiveAgainst: ['FAT'],
-    notVeryEffectiveAgainst: ['PROCESSED'],
-    noEffectAgainst: ['PROTEIN'],
+    notVeryEffectiveAgainst: ['PROCESSED', 'PROTEIN'], // PROTEIN changed from immune to resist
+    noEffectAgainst: [],
   },
   FAT: {
     superEffectiveAgainst: ['PROTEIN'],
@@ -28,8 +28,8 @@ export const TYPE_CHART: Record<NutritionalType, TypeMatchup> = {
   },
   PROCESSED: {
     superEffectiveAgainst: ['CARB', 'PROTEIN'],
-    notVeryEffectiveAgainst: [],
-    noEffectAgainst: ['FIBER'],
+    notVeryEffectiveAgainst: ['FIBER'], // FIBER changed from immune to resist
+    noEffectAgainst: [],
   },
 };
 
@@ -69,6 +69,55 @@ export function calculateTypeMultiplier(
   }
 
   return finalMultiplier;
+}
+
+/**
+ * Type matchups that have reduced accuracy (soft immunity)
+ * These moves have a chance to miss even at 100% base accuracy
+ */
+const TYPE_ACCURACY_PENALTIES: Record<NutritionalType, { poorMatchups: NutritionalType[]; accuracyModifier: number }> = {
+  PROTEIN: {
+    poorMatchups: ['FAT'],           // PROTEIN struggles against FAT
+    accuracyModifier: 0.6,           // 60% accuracy (40% miss chance)
+  },
+  CARB: {
+    poorMatchups: ['PROTEIN'],       // CARB struggles against PROTEIN
+    accuracyModifier: 0.6,           // 60% accuracy
+  },
+  FAT: {
+    poorMatchups: [],                // FAT has no poor matchups
+    accuracyModifier: 1.0,
+  },
+  FIBER: {
+    poorMatchups: [],                // FIBER has no poor matchups
+    accuracyModifier: 1.0,
+  },
+  PROCESSED: {
+    poorMatchups: ['FIBER'],         // PROCESSED struggles against FIBER
+    accuracyModifier: 0.6,           // 60% accuracy
+  },
+};
+
+/**
+ * Calculate type-based accuracy modifier
+ * Returns a multiplier (0.6 for poor matchup, 1.0 for normal)
+ */
+export function getTypeAccuracyModifier(
+  attackType: NutritionalType | undefined,
+  defenderTypes: NutritionalType[]
+): number {
+  if (!attackType) return 1.0; // Untyped moves always have normal accuracy
+
+  const penaltyData = TYPE_ACCURACY_PENALTIES[attackType];
+
+  // Check if any defender type is in the poor matchups list
+  for (const defType of defenderTypes) {
+    if (penaltyData.poorMatchups.includes(defType)) {
+      return penaltyData.accuracyModifier;
+    }
+  }
+
+  return 1.0; // Normal accuracy
 }
 
 /**
