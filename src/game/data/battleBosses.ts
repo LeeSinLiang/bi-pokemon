@@ -15,11 +15,13 @@ export const BATTLE_BOSSES: Record<string, BattleBossData> = {
     visuals:
       'Massive green serpent with soggy cucumber/chip scales emerging from frying oil. Glowing red eyes, dripping sludge.',
     archetype: 'The Bloated Tyrant. Gluttonous, sluggish, toxic.',
+
+    // Default values (for backward compatibility, overridden by phases)
     types: ['PROCESSED', 'FAT'],
     spriteKey: 'boss-serpent',
     damagedSpriteKey: 'boss-serpent-damage',
     baseStats: {
-      maxHP: 200,
+      maxHP: 150,
       attack: 85,
       defense: 80,
       speed: 60,
@@ -33,44 +35,207 @@ export const BATTLE_BOSSES: Record<string, BattleBossData> = {
         evadeCategories: ['PHYSICAL'],
       },
     },
-    moveset: [
+    moveset: [],
+
+    // Multi-phase boss configuration
+    phases: [
+      // ===== PHASE 1: The Bloated Tyrant (150 HP) =====
       {
-        name: 'Grease Slam',
-        category: 'PHYSICAL',
-        type: 'FAT',
-        power: 80,
-        accuracy: 90, // Heavy physical attack has lower accuracy
-        description:
-          '30% chance to apply \'Greased\' status (Sharply lowers target Speed).',
-        effect: {
-          statusEffect: 'GREASED',
-          statusChance: 30,
+        phaseNumber: 1,
+        name: 'The Bloated Tyrant',
+        types: ['PROCESSED', 'FAT'],
+        spriteKey: 'boss-serpent',
+        backgroundKey: 'battle-bg-level-2',
+        baseStats: {
+          maxHP: 150,
+          attack: 85,
+          defense: 80,
+          speed: 60,
+        },
+        passiveAbility: {
+          name: 'Slippery Scales',
+          description: 'Coated in oily slick. 20% chance to evade incoming PHYSICAL attacks.',
+          effect: {
+            evadeChance: 20,
+            evadeCategories: ['PHYSICAL'],
+          },
+        },
+        moveset: [
+          {
+            name: 'Grease Slam',
+            category: 'PHYSICAL',
+            type: 'FAT',
+            power: 80,
+            accuracy: 90,
+            description: '30% chance to apply \'Greased\' status (Sharply lowers target Speed).',
+            effect: {
+              statusEffect: 'GREASED',
+              statusChance: 30,
+            },
+          },
+          {
+            name: 'Salt Spray',
+            category: 'RANGED',
+            type: 'PROCESSED',
+            power: 60,
+            accuracy: 100,
+            neverMiss: true,
+            description: 'Toxic spray that never misses! 100% chance to apply \'Dehydrated\' status.',
+            effect: {
+              statusEffect: 'DEHYDRATED',
+              statusChance: 100,
+            },
+          },
+          {
+            name: 'Sodium Overload',
+            category: 'ULTIMATE',
+            type: 'PROCESSED',
+            power: 120,
+            accuracy: 85,
+            description: 'Powerful attack. If this knocks out a target, heals 20% max HP.',
+            effect: {
+              healOnKO: 20,
+            },
+          },
+        ],
+      },
+
+      // ===== PHASE 2: Greasy Inferno (250 HP) =====
+      {
+        phaseNumber: 2,
+        name: 'Greasy Inferno',
+        types: ['OIL', 'PROCESSED'],
+        spriteKey: 'boss-serpent-phase-2',
+        backgroundKey: 'battle-bg-level-2-phase-2',
+        baseStats: {
+          maxHP: 250,
+          attack: 95,
+          defense: 70,
+          speed: 85,
+        },
+        passiveAbility: {
+          name: 'Boiling Rage',
+          description: 'When hit for >25% HP, counters with 50 damage. Immune to status effects.',
+          effect: {
+            counterThreshold: 0.25,
+            counterDamage: 50,
+            statusImmune: true,
+          },
+        },
+        moveset: [
+          {
+            name: 'Burning Oil Slam',
+            category: 'PHYSICAL',
+            type: 'OIL',
+            power: 95,
+            accuracy: 90,
+            description: 'Flaming oil-coated slam. 60% chance to Burn.',
+            effect: {
+              statusEffect: 'BURNED',
+              statusChance: 60,
+            },
+          },
+          {
+            name: 'Toxic Heatwave',
+            category: 'SPECIAL',
+            type: 'OIL',
+            power: 75,
+            accuracy: 100,
+            neverMiss: true,
+            description: 'Toxic heat wave hits all party members! 100% chance to Burn or Dehydrate.',
+            effect: {
+              hitsAllParty: true,
+              statusEffect: 'BURNED', // Applied randomly between BURNED and DEHYDRATED
+              statusChance: 100,
+            },
+          },
+          {
+            name: 'Grease Fire Eruption',
+            category: 'ULTIMATE',
+            type: 'OIL',
+            power: 150,
+            accuracy: 80,
+            description: 'Massive grease fire explosion! If KO: heal 40% HP + Attack +2 stages.',
+            effect: {
+              healOnKO: 40,
+              statModifierOnKO: {
+                stat: 'ATTACK',
+                stages: 2,
+              },
+            },
+          },
+        ],
+        environmentalHazard: {
+          type: 'BOILING_SWAMP',
+          damagePercent: 8,
+          message: 'The boiling swamp sears {target}!',
         },
       },
+
+      // ===== PHASE 3: Dying Flames (200 HP) =====
       {
-        name: 'Salt Spray',
-        category: 'RANGED',
-        type: 'PROCESSED',
-        power: 60,
-        accuracy: 100,
-        neverMiss: true, // Toxic spray that blankets the area - always hits
-        description: 'Toxic spray that never misses! 100% chance to apply \'Dehydrated\' status.',
-        effect: {
-          statusEffect: 'DEHYDRATED',
-          statusChance: 100,
+        phaseNumber: 3,
+        name: 'Dying Flames',
+        types: ['PROCESSED', 'FAT'],
+        spriteKey: 'boss-serpent-damage',
+        backgroundKey: 'battle-bg-level-2',
+        baseStats: {
+          maxHP: 200,
+          attack: 100,
+          defense: 50,
+          speed: 95,
         },
-      },
-      {
-        name: 'Sodium Overload',
-        category: 'ULTIMATE',
-        type: 'PROCESSED',
-        power: 120,
-        accuracy: 85, // Powerful but harder to land
-        description:
-          'Powerful attack with lower accuracy. If this move knocks out a target, the user heals 20% of its max HP.',
-        effect: {
-          healOnKO: 20,
+        passiveAbility: {
+          name: 'Cornered Predator',
+          description: 'All attacks have +1 priority. Gains +1 Attack stage at end of each turn.',
+          effect: {
+            priority: 1,
+            attackGainPerTurn: 1,
+          },
         },
+        moveset: [
+          {
+            name: 'Frenzied Slam',
+            category: 'PHYSICAL',
+            type: 'FAT',
+            power: 110,
+            accuracy: 85,
+            description: 'Desperate frenzied attack! 100% chance to Grease.',
+            effect: {
+              statusEffect: 'GREASED',
+              statusChance: 100,
+            },
+          },
+          {
+            name: 'Sludge Burst',
+            category: 'SPECIAL',
+            type: 'PROCESSED',
+            power: 90,
+            accuracy: 95,
+            description: 'Toxic sludge burst that ignores defense stages. 70% Dehydrated.',
+            effect: {
+              ignoreDefenseStages: true,
+              statusEffect: 'DEHYDRATED',
+              statusChance: 70,
+            },
+          },
+          {
+            name: 'Dying Breath',
+            category: 'ULTIMATE',
+            type: 'PROCESSED',
+            power: 0, // Calculated dynamically: (maxHP - currentHP) * 1.2
+            accuracy: 70,
+            description: 'Desperate final attack! Power increases as HP decreases. If KO: heal 60% HP. Self-damages 25% after use.',
+            effect: {
+              dynamicPower: {
+                formula: 'missingHP',
+                multiplier: 1.2,
+              },
+              healOnKO: 60,
+              recoilPercent: 25,
+            },
+          },
+        ],
       },
     ],
   },

@@ -45,6 +45,21 @@ export const BATTLE_PETS: Record<string, BattlePetData> = {
           bonusAgainstType: 'PROCESSED', // Extra 50% damage vs PROCESSED
         },
       },
+      {
+        name: 'Citrus Cleanse',
+        category: 'UTILITY',
+        type: 'FIBER',
+        power: 0,
+        accuracy: 100,
+        neverMiss: true,
+        description: 'Refreshing citrus purifies the environment! Removes hazards for 3 turns, heals 15% HP, and cures Burned/Dehydrated status.',
+        effect: {
+          purifyHazards: true,
+          purifyDuration: 3,
+          healPercent: 15,
+          cureStatus: ['BURNED', 'DEHYDRATED'],
+        },
+      },
     ],
   },
 

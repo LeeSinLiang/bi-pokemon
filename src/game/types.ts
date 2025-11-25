@@ -302,7 +302,7 @@ export interface AnimationConfig {
 // ============================================================================
 
 // Nutritional types
-export type NutritionalType = 'PROTEIN' | 'CARB' | 'FAT' | 'FIBER' | 'PROCESSED';
+export type NutritionalType = 'PROTEIN' | 'CARB' | 'FAT' | 'FIBER' | 'PROCESSED' | 'OIL';
 
 // Skill categories
 export type SkillCategory =
@@ -322,7 +322,8 @@ export type StatusEffect =
   | 'GREASED'     // Speed sharply lowered
   | 'SOUR'        // Accuracy lowered
   | 'SLEEP'       // Cannot act
-  | 'TRAPPED';    // Cannot swap
+  | 'TRAPPED'     // Cannot swap
+  | 'BURNED';     // 12% HP damage per turn + Attack -1 stage
 
 // Stat modifications
 export type StatModifier = 'ATTACK' | 'DEFENSE' | 'SPEED' | 'ACCURACY' | 'EVASION';
@@ -360,6 +361,23 @@ export interface BattlePetSkill {
     recoil?: number;           // Recoil damage as % of damage dealt
     healOnKO?: number;         // % of max HP to heal if this KOs target
     bonusAgainstType?: NutritionalType; // Deals extra damage to this type
+    // Citrus Cleanse specific
+    purifyHazards?: boolean;   // Removes environmental hazards
+    purifyDuration?: number;   // Duration of hazard removal in turns
+    healPercent?: number;      // % of max HP to heal
+    cureStatus?: StatusEffect[]; // Status effects to cure
+    // Phase 2/3 boss specific
+    hitsAllParty?: boolean;    // Hits all party members
+    ignoreDefenseStages?: boolean; // Ignores defense stat stages
+    dynamicPower?: {           // Dynamic power calculation
+      formula: 'missingHP';
+      multiplier: number;
+    };
+    recoilPercent?: number;    // Self-damage as % of max HP after use
+    statModifierOnKO?: {       // Stat boost if KO
+      stat: StatModifier;
+      stages: number;
+    };
   };
 }
 
@@ -383,6 +401,31 @@ export interface BattlePetData {
   };
 }
 
+export interface BossPhaseData {
+  phaseNumber: number;
+  name: string;                    // Phase-specific name (e.g., "Greasy Inferno")
+  types: NutritionalType[];
+  spriteKey: string;
+  backgroundKey?: string;          // Phase-specific background
+  baseStats: {
+    maxHP: number;
+    attack: number;
+    defense: number;
+    speed: number;
+  };
+  passiveAbility?: {
+    name: string;
+    description: string;
+    effect?: any;                  // Custom logic data
+  };
+  moveset: BattlePetSkill[];
+  environmentalHazard?: {
+    type: 'BOILING_SWAMP' | 'TOXIC_GAS' | 'BURNING_GROUND';
+    damagePercent: number;         // % of max HP per turn
+    message: string;
+  };
+}
+
 export interface BattleBossData {
   id: string;
   name: string;
@@ -390,6 +433,8 @@ export interface BattleBossData {
   locationName: string;
   visuals: string;
   archetype: string;
+
+  // Single-phase boss properties (used if no phases array)
   types: NutritionalType[];
   spriteKey: string;
   damagedSpriteKey?: string;   // Sprite when HP < 50%
@@ -405,6 +450,9 @@ export interface BattleBossData {
     effect?: any;              // Custom logic data
   };
   moveset: BattlePetSkill[];
+
+  // Multi-phase boss support
+  phases?: BossPhaseData[];      // If present, boss has multiple phases
 }
 
 export interface BattleCombatant {

@@ -22,13 +22,18 @@ export const TYPE_CHART: Record<NutritionalType, TypeMatchup> = {
     noEffectAgainst: [],
   },
   FIBER: {
-    superEffectiveAgainst: ['PROCESSED', 'FAT'],
+    superEffectiveAgainst: ['PROCESSED', 'FAT', 'OIL'], // FIBER cleanses oils
     notVeryEffectiveAgainst: ['PROTEIN'],
     noEffectAgainst: [],
   },
   PROCESSED: {
     superEffectiveAgainst: ['CARB', 'PROTEIN'],
     notVeryEffectiveAgainst: ['FIBER'], // FIBER changed from immune to resist
+    noEffectAgainst: [],
+  },
+  OIL: {
+    superEffectiveAgainst: ['PROTEIN', 'CARB'], // Oils coat and disrupt proteins/carbs
+    notVeryEffectiveAgainst: ['FIBER', 'FAT'], // Fiber absorbs oils, FAT is similar
     noEffectAgainst: [],
   },
 };
@@ -96,6 +101,10 @@ const TYPE_ACCURACY_PENALTIES: Record<NutritionalType, { poorMatchups: Nutrition
     poorMatchups: ['FIBER'],         // PROCESSED struggles against FIBER
     accuracyModifier: 0.6,           // 60% accuracy
   },
+  OIL: {
+    poorMatchups: ['FIBER'],         // OIL struggles against FIBER (absorbed)
+    accuracyModifier: 0.6,           // 60% accuracy
+  },
 };
 
 /**
@@ -139,6 +148,7 @@ export const TYPE_COLORS: Record<NutritionalType, string> = {
   FAT: '#FFB74D',        // Orange
   FIBER: '#81C784',      // Green
   PROCESSED: '#9575CD',  // Purple
+  OIL: '#8B4513',        // Brown (refined oils/trans fats)
 };
 
 /**
@@ -150,4 +160,5 @@ export const TYPE_ICONS: Record<NutritionalType, string> = {
   FAT: '🥑',
   FIBER: '🥗',
   PROCESSED: '🍭',
+  OIL: '🛢️',
 };

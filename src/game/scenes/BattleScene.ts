@@ -12,6 +12,8 @@ import type {
   StatusEffect,
   StatModifier,
   NutritionalType,
+  BattleBossData,
+  BossPhaseData,
 } from '../types';
 import { BATTLE_PETS, getBattlePet } from '../data/battlePets';
 import { getBossByLevel } from '../data/battleBosses';
@@ -47,6 +49,12 @@ export default class BattleScene extends Phaser.Scene {
   private playerParty: BattleCombatant[] = [];
   private activePlayerIndex: number = 0;
 
+  // Phase system (multi-phase bosses)
+  private bossData!: BattleBossData;
+  private currentPhase: number = 1;
+  private environmentalHazard: { type: string; damagePercent: number; message: string } | null = null;
+  private hazardPurifiedTurns: number = 0;
+
   // UI Components
   private background!: Phaser.GameObjects.Image;
   private playerHealthBar!: HealthBarUI;
@@ -59,6 +67,12 @@ export default class BattleScene extends Phaser.Scene {
   private actionMenu!: Phaser.GameObjects.Container;
   private skillMenu!: Phaser.GameObjects.Container;
   private swapMenu?: SwapMenuUI;
+
+  // Music
+  private battleMusic?: Phaser.Sound.BaseSound;
+
+  // Debug: Skip delays on click
+  private skipDelay: boolean = false;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -76,10 +90,14 @@ export default class BattleScene extends Phaser.Scene {
    * Preload battle assets
    */
   preload(): void {
-    // Load battle background for Level 2
+    // Load battle backgrounds
     this.load.image(
       'battle-bg-level-2',
       '/assets/dungeon/battle/backgrounds/level-2.png'
+    );
+    this.load.image(
+      'battle-bg-level-2-phase-2',
+      '/assets/dungeon/battle/backgrounds/level-2-phase-2.png'
     );
 
     // Load pet sprites
@@ -96,14 +114,32 @@ export default class BattleScene extends Phaser.Scene {
       '/assets/dungeon/battle/pets/tart-le.png'
     );
 
-    // Load boss sprites
+    // Load boss sprites (all phases)
     this.load.image(
       'boss-serpent',
       '/assets/dungeon/battle/enemies/serpent.png'
     );
     this.load.image(
+      'boss-serpent-phase-2',
+      '/assets/dungeon/battle/enemies/serpent-phase-2.png'
+    );
+    this.load.image(
       'boss-serpent-damage',
       '/assets/dungeon/battle/enemies/serpent-damage.png'
+    );
+
+    // Load battle music for each phase
+    this.load.audio(
+      'battle-music-phase-1',
+      '/assets/dungeon/battle/ost/Byte In Intro Phase 1.m4a'
+    );
+    this.load.audio(
+      'battle-music-phase-2',
+      '/assets/dungeon/battle/ost/Byte In Battle Phase 2.mp3'
+    );
+    this.load.audio(
+      'battle-music-phase-3',
+      '/assets/dungeon/battle/ost/Byte In Phase 3 Ending.mp3'
     );
   }
 
@@ -116,6 +152,18 @@ export default class BattleScene extends Phaser.Scene {
 
     // Create background
     this.createBackground();
+
+    // Start Phase 1 music
+    this.playPhaseMusic(1);
+
+    // Add click listener for debug skip (click outside of buttons)
+    this.input.on('pointerdown', () => {
+      // Only skip if not clicking on a UI button
+      const clickedOnUI = this.actionMenu.visible || this.skillMenu.visible;
+      if (!clickedOnUI) {
+        this.skipDelay = true;
+      }
+    });
 
     // Initialize combatants
     this.initializeCombatants();
@@ -131,10 +179,9 @@ export default class BattleScene extends Phaser.Scene {
    * Create background
    */
   private createBackground(): void {
-    // Add battle arena background (9:16 aspect ratio - 400x711)
-    // Position at top (0 to 711) leaving 850-711=139px at bottom for UI
-    this.background = this.add.image(200, 355.5, 'battle-bg-level-2');
-    this.background.setDisplaySize(400, 711);
+    // Add battle arena background - full canvas (400x850)
+    this.background = this.add.image(200, 425, 'battle-bg-level-2');
+    this.background.setDisplaySize(400, 850);
   }
 
   /**
@@ -177,26 +224,113 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
 
-    // Create enemy combatant
-    this.enemyCombatant = {
-      id: bossData.id,
-      name: bossData.name,
-      types: bossData.types,
-      currentHP: bossData.baseStats.maxHP,
-      maxHP: bossData.baseStats.maxHP,
-      baseAttack: bossData.baseStats.attack,
-      baseDefense: bossData.baseStats.defense,
-      baseSpeed: bossData.baseStats.speed,
-      skills: bossData.moveset,
-      statusEffects: [],
-      statModifiers: new Map(),
-      isPlayer: false,
-      passiveAbility: bossData.passiveAbility,
-    };
+    // Store boss data for phase management
+    this.bossData = bossData;
+    this.currentPhase = 1;
+
+    // Initialize boss from phase data (or fallback to single-phase)
+    this.initializeBossFromPhase(this.currentPhase);
 
     console.log('Combatants initialized:', {
       player: this.playerCombatant.name,
       enemy: this.enemyCombatant.name,
+    });
+  }
+
+  /**
+   * Initialize or update boss from phase data
+   * @param phaseNumber - The phase number (1, 2, 3, etc.)
+   */
+  private initializeBossFromPhase(phaseNumber: number): void {
+    const phases = this.bossData.phases;
+    let phaseData: BossPhaseData | null = null;
+
+    // Get phase data if available
+    if (phases && phases.length > 0) {
+      phaseData = phases.find(p => p.phaseNumber === phaseNumber) || null;
+    }
+
+    // If no phase data, use fallback single-phase data from boss
+    if (!phaseData) {
+      // Single-phase boss (backward compatibility)
+      if (!this.enemyCombatant) {
+        this.enemyCombatant = {
+          id: this.bossData.id,
+          name: this.bossData.name,
+          types: this.bossData.types,
+          currentHP: this.bossData.baseStats.maxHP,
+          maxHP: this.bossData.baseStats.maxHP,
+          baseAttack: this.bossData.baseStats.attack,
+          baseDefense: this.bossData.baseStats.defense,
+          baseSpeed: this.bossData.baseStats.speed,
+          skills: this.bossData.moveset,
+          statusEffects: [],
+          statModifiers: new Map(),
+          isPlayer: false,
+          passiveAbility: this.bossData.passiveAbility,
+        };
+      } else {
+        // Update existing combatant
+        this.enemyCombatant.types = this.bossData.types;
+        this.enemyCombatant.maxHP = this.bossData.baseStats.maxHP;
+        this.enemyCombatant.currentHP = this.bossData.baseStats.maxHP;
+        this.enemyCombatant.baseAttack = this.bossData.baseStats.attack;
+        this.enemyCombatant.baseDefense = this.bossData.baseStats.defense;
+        this.enemyCombatant.baseSpeed = this.bossData.baseStats.speed;
+        this.enemyCombatant.skills = this.bossData.moveset;
+        this.enemyCombatant.passiveAbility = this.bossData.passiveAbility;
+      }
+      this.environmentalHazard = null;
+      return;
+    }
+
+    // Multi-phase boss initialization
+    if (!this.enemyCombatant) {
+      // First initialization
+      this.enemyCombatant = {
+        id: this.bossData.id,
+        name: `${this.bossData.name} (${phaseData.name})`,
+        types: phaseData.types,
+        currentHP: phaseData.baseStats.maxHP,
+        maxHP: phaseData.baseStats.maxHP,
+        baseAttack: phaseData.baseStats.attack,
+        baseDefense: phaseData.baseStats.defense,
+        baseSpeed: phaseData.baseStats.speed,
+        skills: phaseData.moveset,
+        statusEffects: [],
+        statModifiers: new Map(),
+        isPlayer: false,
+        passiveAbility: phaseData.passiveAbility,
+      };
+    } else {
+      // Phase transition - update existing combatant
+      this.enemyCombatant.name = `${this.bossData.name} (${phaseData.name})`;
+      this.enemyCombatant.types = phaseData.types;
+      this.enemyCombatant.maxHP = phaseData.baseStats.maxHP;
+      this.enemyCombatant.currentHP = phaseData.baseStats.maxHP; // Full HP restore
+      this.enemyCombatant.baseAttack = phaseData.baseStats.attack;
+      this.enemyCombatant.baseDefense = phaseData.baseStats.defense;
+      this.enemyCombatant.baseSpeed = phaseData.baseStats.speed;
+      this.enemyCombatant.skills = phaseData.moveset;
+      this.enemyCombatant.statusEffects = []; // Clear status effects
+      this.enemyCombatant.statModifiers.clear(); // Reset stat stages
+      this.enemyCombatant.passiveAbility = phaseData.passiveAbility;
+    }
+
+    // Set up environmental hazard if present
+    if (phaseData.environmentalHazard) {
+      this.environmentalHazard = phaseData.environmentalHazard;
+      this.hazardPurifiedTurns = 0;
+    } else {
+      this.environmentalHazard = null;
+      this.hazardPurifiedTurns = 0;
+    }
+
+    console.log(`Boss initialized for Phase ${phaseNumber}:`, {
+      name: this.enemyCombatant.name,
+      types: this.enemyCombatant.types,
+      hp: this.enemyCombatant.maxHP,
+      hazard: this.environmentalHazard?.type || 'None',
     });
   }
 
@@ -211,6 +345,7 @@ export default class BattleScene extends Phaser.Scene {
       BATTLE_PETS[this.playerCombatant.id.toUpperCase().replace('PET_', '')].spriteKey
     );
     playerSprite.setScale(0.3);
+    playerSprite.setDepth(10); // Pet sprites layer
     this.playerCombatant.sprite = playerSprite;
 
     // Create boss sprite (upper-right position)
@@ -220,6 +355,7 @@ export default class BattleScene extends Phaser.Scene {
       'boss-serpent'
     );
     enemySprite.setScale(0.4);
+    enemySprite.setDepth(10); // Pet sprites layer
     this.enemyCombatant.sprite = enemySprite;
 
     // Create health bars
@@ -231,6 +367,7 @@ export default class BattleScene extends Phaser.Scene {
       this.playerCombatant.currentHP,
       this.playerCombatant.maxHP
     );
+    this.playerHealthBar.setDepth(30); // Health bars layer
 
     this.enemyHealthBar = new HealthBarUI(
       this,
@@ -240,6 +377,7 @@ export default class BattleScene extends Phaser.Scene {
       this.enemyCombatant.currentHP,
       this.enemyCombatant.maxHP
     );
+    this.enemyHealthBar.setDepth(30); // Health bars layer
 
     // Create message log
     this.messageLog = new MessageLogUI(
@@ -247,6 +385,7 @@ export default class BattleScene extends Phaser.Scene {
       200,
       BATTLE_CONFIG.MESSAGE_LOG.Y_POSITION
     );
+    this.messageLog.setDepth(40); // Message log layer
 
     // Create action menu
     this.createActionMenu();
@@ -334,6 +473,7 @@ export default class BattleScene extends Phaser.Scene {
     this.actionButtons.push(fleeBtn);
     this.actionMenu.add(fleeBtn);
 
+    this.actionMenu.setDepth(50); // Action menu on top of everything
     this.actionMenu.setVisible(false);
   }
 
@@ -390,6 +530,7 @@ export default class BattleScene extends Phaser.Scene {
     );
     this.skillMenu.add(backBtn);
 
+    this.skillMenu.setDepth(50); // Skill menu on top of everything
     this.skillMenu.setVisible(false);
   }
 
@@ -617,6 +758,7 @@ export default class BattleScene extends Phaser.Scene {
     );
     newSprite.setScale(0.3);
     newSprite.setAlpha(0);
+    newSprite.setDepth(10); // Pet sprites layer
 
     // Remove old sprite
     if (oldCombatant.sprite) {
@@ -636,6 +778,7 @@ export default class BattleScene extends Phaser.Scene {
       newCombatant.currentHP,
       newCombatant.maxHP
     );
+    this.playerHealthBar.setDepth(30); // Health bars layer
 
     // Update skill cards
     this.skillCards.forEach((card) => card.destroy());
@@ -680,6 +823,7 @@ export default class BattleScene extends Phaser.Scene {
       () => this.showActionMenu()
     );
     this.skillMenu.add(backBtn);
+    this.skillMenu.setDepth(50); // Skill menu on top of everything
 
     this.messageLog.addMessage(
       `Go! ${newCombatant.name}!`,
@@ -810,6 +954,19 @@ export default class BattleScene extends Phaser.Scene {
    */
   private onFleeClicked(): void {
     this.battleState = 'FLED';
+
+    // Fade out music
+    if (this.battleMusic && this.battleMusic.isPlaying) {
+      this.tweens.add({
+        targets: this.battleMusic,
+        volume: 0,
+        duration: 2000,
+        onComplete: () => {
+          this.battleMusic?.stop();
+        },
+      });
+    }
+
     this.messageLog.addMessage('You fled from battle!', 'info');
 
     this.time.delayedCall(2000, () => {
@@ -1060,10 +1217,8 @@ export default class BattleScene extends Phaser.Scene {
       await this.delay(1500);
     }
 
-    // Check if boss should switch to damaged sprite at 25% HP
-    if (!defender.isPlayer && defender.currentHP / defender.maxHP <= 0.25) {
-      defender.sprite?.setTexture('boss-serpent-damage');
-    }
+    // NOTE: Damaged sprite is handled by phase system now
+    // Phase 3 already uses 'boss-serpent-damage' sprite from the start
   }
 
   /**
@@ -1141,6 +1296,61 @@ export default class BattleScene extends Phaser.Scene {
       );
       await this.delay(1500);
     }
+
+    // Handle Citrus Cleanse (purify hazards + heal + cure status)
+    if (effect.purifyHazards) {
+      // Purify environmental hazards
+      if (this.environmentalHazard) {
+        this.hazardPurifiedTurns = effect.purifyDuration || 3;
+        this.messageLog.addMessage(
+          'The refreshing citrus purifies the toxic environment!',
+          'effect'
+        );
+        await this.delay(1500);
+      }
+
+      // Heal attacker
+      if (effect.healPercent) {
+        const healAmount = Math.floor(attacker.maxHP * (effect.healPercent / 100));
+        attacker.currentHP = Math.min(attacker.maxHP, attacker.currentHP + healAmount);
+
+        const healthBar = attacker.isPlayer
+          ? this.playerHealthBar
+          : this.enemyHealthBar;
+        healthBar.setHP(attacker.currentHP);
+
+        this.vfx.showHealNumber(
+          attacker.sprite?.x || 0,
+          attacker.sprite?.y || 0,
+          healAmount
+        );
+        this.messageLog.addMessage(
+          `${attacker.name} restored ${healAmount} HP!`,
+          'effect'
+        );
+        await this.delay(1500);
+      }
+
+      // Cure status effects
+      if (effect.cureStatus && Array.isArray(effect.cureStatus)) {
+        let curedAny = false;
+        for (const status of effect.cureStatus) {
+          const index = attacker.statusEffects.indexOf(status);
+          if (index !== -1) {
+            attacker.statusEffects.splice(index, 1);
+            curedAny = true;
+          }
+        }
+
+        if (curedAny) {
+          this.messageLog.addMessage(
+            `${attacker.name} was cured of its status ailments!`,
+            'effect'
+          );
+          await this.delay(1500);
+        }
+      }
+    }
   }
 
   /**
@@ -1159,6 +1369,7 @@ export default class BattleScene extends Phaser.Scene {
         SOUR: '🍋',
         SLEEP: '💤',
         TRAPPED: '🌀',
+        BURNED: '🔥',
       };
 
       const statusNames: Record<StatusEffect, string> = {
@@ -1167,6 +1378,7 @@ export default class BattleScene extends Phaser.Scene {
         SOUR: 'Sour',
         SLEEP: 'Asleep',
         TRAPPED: 'Trapped',
+        BURNED: 'Burned',
       };
 
       this.vfx.showStatusEffect(
@@ -1208,9 +1420,15 @@ export default class BattleScene extends Phaser.Scene {
 
     // Process player status effects
     if (this.playerCombatant.statusEffects.includes('DEHYDRATED')) {
-      const damage =
-        this.playerCombatant.maxHP *
-        (BATTLE_CONFIG.DEHYDRATED_DAMAGE_PERCENT / 100);
+      // Calculate defense modifier (higher defense = less DoT damage)
+      const defenseStage = this.playerCombatant.statModifiers.get('DEFENSE') || 0;
+      const defenseMultiplier = this.getStatMultiplier(defenseStage);
+      const effectiveDefense = this.playerCombatant.baseDefense * defenseMultiplier;
+      const defenseReduction = 100 / (50 + effectiveDefense);
+
+      const baseDamage = this.playerCombatant.maxHP * (BATTLE_CONFIG.DEHYDRATED_DAMAGE_PERCENT / 100);
+      const damage = Math.floor(baseDamage * defenseReduction);
+
       this.playerCombatant.currentHP = Math.max(
         0,
         this.playerCombatant.currentHP - damage
@@ -1232,11 +1450,56 @@ export default class BattleScene extends Phaser.Scene {
       await this.delay(1500);
     }
 
+    // Process BURNED status for player
+    if (this.playerCombatant.statusEffects.includes('BURNED')) {
+      // Calculate defense modifier (higher defense = less DoT damage)
+      const defenseStage = this.playerCombatant.statModifiers.get('DEFENSE') || 0;
+      const defenseMultiplier = this.getStatMultiplier(defenseStage);
+      const effectiveDefense = this.playerCombatant.baseDefense * defenseMultiplier;
+      const defenseReduction = 100 / (50 + effectiveDefense);
+
+      const baseDamage = this.playerCombatant.maxHP * 0.12;
+      const damage = Math.floor(baseDamage * defenseReduction);
+
+      this.playerCombatant.currentHP = Math.max(
+        0,
+        this.playerCombatant.currentHP - damage
+      );
+      this.playerHealthBar.setHP(this.playerCombatant.currentHP);
+
+      // Apply Attack -1 if not already applied (only once per burn)
+      if (!this.playerCombatant.statModifiers.has('ATTACK') ||
+          this.playerCombatant.statModifiers.get('ATTACK')! >= 0) {
+        const currentStages = this.playerCombatant.statModifiers.get('ATTACK') || 0;
+        this.playerCombatant.statModifiers.set('ATTACK', Math.max(-6, currentStages - 1));
+      }
+
+      this.vfx.showDamageNumber(
+        this.playerCombatant.sprite?.x || 0,
+        this.playerCombatant.sprite?.y || 0,
+        damage,
+        false,
+        false
+      );
+
+      this.messageLog.addMessage(
+        `${this.playerCombatant.name} is suffering from burns!`,
+        'status'
+      );
+      await this.delay(1500);
+    }
+
     // Process enemy status effects
     if (this.enemyCombatant.statusEffects.includes('DEHYDRATED')) {
-      const damage =
-        this.enemyCombatant.maxHP *
-        (BATTLE_CONFIG.DEHYDRATED_DAMAGE_PERCENT / 100);
+      // Calculate defense modifier (higher defense = less DoT damage)
+      const defenseStage = this.enemyCombatant.statModifiers.get('DEFENSE') || 0;
+      const defenseMultiplier = this.getStatMultiplier(defenseStage);
+      const effectiveDefense = this.enemyCombatant.baseDefense * defenseMultiplier;
+      const defenseReduction = 100 / (50 + effectiveDefense);
+
+      const baseDamage = this.enemyCombatant.maxHP * (BATTLE_CONFIG.DEHYDRATED_DAMAGE_PERCENT / 100);
+      const damage = Math.floor(baseDamage * defenseReduction);
+
       this.enemyCombatant.currentHP = Math.max(
         0,
         this.enemyCombatant.currentHP - damage
@@ -1258,6 +1521,97 @@ export default class BattleScene extends Phaser.Scene {
       await this.delay(1500);
     }
 
+    // Process BURNED status for enemy
+    if (this.enemyCombatant.statusEffects.includes('BURNED')) {
+      // Calculate defense modifier (higher defense = less DoT damage)
+      const defenseStage = this.enemyCombatant.statModifiers.get('DEFENSE') || 0;
+      const defenseMultiplier = this.getStatMultiplier(defenseStage);
+      const effectiveDefense = this.enemyCombatant.baseDefense * defenseMultiplier;
+      const defenseReduction = 100 / (50 + effectiveDefense);
+
+      const baseDamage = this.enemyCombatant.maxHP * 0.12;
+      const damage = Math.floor(baseDamage * defenseReduction);
+
+      this.enemyCombatant.currentHP = Math.max(
+        0,
+        this.enemyCombatant.currentHP - damage
+      );
+      this.enemyHealthBar.setHP(this.enemyCombatant.currentHP);
+
+      // Apply Attack -1 if not already applied
+      if (!this.enemyCombatant.statModifiers.has('ATTACK') ||
+          this.enemyCombatant.statModifiers.get('ATTACK')! >= 0) {
+        const currentStages = this.enemyCombatant.statModifiers.get('ATTACK') || 0;
+        this.enemyCombatant.statModifiers.set('ATTACK', Math.max(-6, currentStages - 1));
+      }
+
+      this.vfx.showDamageNumber(
+        this.enemyCombatant.sprite?.x || 0,
+        this.enemyCombatant.sprite?.y || 0,
+        damage,
+        false,
+        false
+      );
+
+      this.messageLog.addMessage(
+        `${this.enemyCombatant.name} is suffering from burns!`,
+        'status'
+      );
+      await this.delay(1500);
+    }
+
+    // Process environmental hazard damage (player only)
+    if (this.environmentalHazard && this.hazardPurifiedTurns <= 0) {
+      const damage = Math.floor(
+        this.playerCombatant.maxHP * (this.environmentalHazard.damagePercent / 100)
+      );
+      this.playerCombatant.currentHP = Math.max(
+        0,
+        this.playerCombatant.currentHP - damage
+      );
+      this.playerHealthBar.setHP(this.playerCombatant.currentHP);
+
+      this.vfx.showDamageNumber(
+        this.playerCombatant.sprite?.x || 0,
+        this.playerCombatant.sprite?.y || 0,
+        damage,
+        false,
+        false
+      );
+
+      const message = this.environmentalHazard.message.replace(
+        '{target}',
+        this.playerCombatant.name
+      );
+      this.messageLog.addMessage(message, 'status');
+      await this.delay(1500);
+    }
+
+    // Decrement hazard purification timer
+    if (this.hazardPurifiedTurns > 0) {
+      this.hazardPurifiedTurns--;
+      if (this.hazardPurifiedTurns === 0 && this.environmentalHazard) {
+        this.messageLog.addMessage('The environment becomes toxic again!', 'info');
+        await this.delay(1000);
+      }
+    }
+
+    // Phase 3 passive: Cornered Predator (Attack +1 per turn)
+    if (this.currentPhase === 3 && this.bossData.phases) {
+      const phase3Data = this.bossData.phases.find(p => p.phaseNumber === 3);
+      if (phase3Data?.passiveAbility?.effect?.attackGainPerTurn) {
+        const currentAttackStage = this.enemyCombatant.statModifiers.get('ATTACK') || 0;
+        const newStage = Math.min(6, currentAttackStage + 1);
+        this.enemyCombatant.statModifiers.set('ATTACK', newStage);
+
+        this.messageLog.addMessage(
+          `${this.enemyCombatant.name}'s desperation grows! Attack rose!`,
+          'effect'
+        );
+        await this.delay(1000);
+      }
+    }
+
     // Clear TRAPPED status after turn
     const playerTrappedIndex =
       this.playerCombatant.statusEffects.indexOf('TRAPPED');
@@ -1272,22 +1626,218 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   /**
-   * Check if battle has ended
+   * Check if battle has ended (or phase transition needed)
    */
   private checkBattleEnd(): boolean {
+    // Check if boss is defeated
     if (this.enemyCombatant.currentHP === 0) {
-      this.battleState = 'VICTORY';
-      this.onVictory();
-      return true;
+      // Check if boss has more phases
+      if (this.bossData.phases && this.currentPhase < this.bossData.phases.length) {
+        // Phase transition
+        this.triggerPhaseTransition();
+        return true; // Pause battle flow for transition
+      } else {
+        // Final phase defeated - victory!
+        this.battleState = 'VICTORY';
+        this.onVictory();
+        return true;
+      }
     }
 
+    // Check if current player pet is defeated
     if (this.playerCombatant.currentHP === 0) {
-      this.battleState = 'DEFEAT';
-      this.onDefeat();
-      return true;
+      // Check if there are other alive pets in the party
+      const alivePets = this.playerParty.filter(pet => pet.currentHP > 0);
+
+      if (alivePets.length > 0) {
+        // Auto-swap to next alive pet
+        this.triggerAutoSwap();
+        return true; // Pause battle flow for swap
+      } else {
+        // All pets defeated - party wipe!
+        this.battleState = 'DEFEAT';
+        this.onDefeat();
+        return true;
+      }
     }
 
     return false;
+  }
+
+  /**
+   * Auto-swap to next alive pet when current one faints
+   */
+  private async triggerAutoSwap(): Promise<void> {
+    this.messageLog.addMessage(
+      `${this.playerCombatant.name} fainted!`,
+      'status'
+    );
+    await this.delay(1500);
+
+    // Find next alive pet
+    let nextIndex = -1;
+    for (let i = 0; i < this.playerParty.length; i++) {
+      if (this.playerParty[i].currentHP > 0) {
+        nextIndex = i;
+        break;
+      }
+    }
+
+    if (nextIndex === -1) {
+      // No alive pets (shouldn't happen, but safety check)
+      this.battleState = 'DEFEAT';
+      this.onDefeat();
+      return;
+    }
+
+    // Perform swap
+    await this.performSwap(nextIndex);
+
+    this.messageLog.addMessage(
+      `Go, ${this.playerCombatant.name}!`,
+      'action'
+    );
+    await this.delay(1500);
+
+    // Resume battle - enemy's turn since pet fainted
+    if (this.enemyCombatant.currentHP > 0) {
+      const enemySkill = this.selectBossSkill();
+      await this.executeSkill(this.enemyCombatant, this.playerCombatant, enemySkill);
+
+      // Check for battle end after enemy attack
+      if (this.checkBattleEnd()) {
+        return;
+      }
+
+      // Process end of turn
+      await this.processEndOfTurn();
+
+      if (this.checkBattleEnd()) {
+        return;
+      }
+    }
+
+    // Start next turn
+    this.startPlayerTurn();
+  }
+
+  /**
+   * Trigger phase transition animation and setup
+   */
+  private async triggerPhaseTransition(): Promise<void> {
+    const nextPhase = this.currentPhase + 1;
+    const phaseData = this.bossData.phases?.find(p => p.phaseNumber === nextPhase);
+
+    if (!phaseData) {
+      console.error('Phase data not found for phase', nextPhase);
+      return;
+    }
+
+    // Play transition animation
+    await this.playPhaseTransition(nextPhase, phaseData);
+
+    // Update phase number
+    this.currentPhase = nextPhase;
+
+    // Initialize boss with new phase data
+    this.initializeBossFromPhase(nextPhase);
+
+    // Update UI with new boss data
+    this.updateBossUI(phaseData);
+
+    // Resume battle - player's turn
+    this.startPlayerTurn();
+  }
+
+  /**
+   * Play phase transition animation
+   */
+  private async playPhaseTransition(phaseNumber: number, phaseData: BossPhaseData): Promise<void> {
+    // Disable input during transition
+    this.actionMenu.setVisible(false);
+    this.skillMenu.setVisible(false);
+
+    // Transition message
+    let transitionMessage = '';
+    if (phaseNumber === 2) {
+      transitionMessage = 'The Sodium Serpent ignites in a greasy inferno!';
+    } else if (phaseNumber === 3) {
+      transitionMessage = 'The flames die out, but the serpent grows desperate!';
+    } else {
+      transitionMessage = `Phase ${phaseNumber} begins!`;
+    }
+
+    // Show message
+    this.messageLog.addMessage(transitionMessage, 'effect');
+    await this.delay(2000);
+
+    // Flash effect on boss sprite
+    if (this.enemyCombatant.sprite) {
+      for (let i = 0; i < 3; i++) {
+        await new Promise<void>((resolve) => {
+          this.tweens.add({
+            targets: this.enemyCombatant.sprite,
+            alpha: 0,
+            duration: 200,
+            yoyo: true,
+            onComplete: () => resolve(),
+          });
+        });
+      }
+      // IMPORTANT: Reset alpha to 1 after flashing
+      this.enemyCombatant.sprite.setAlpha(1);
+    }
+
+    // Change boss sprite
+    if (this.enemyCombatant.sprite && phaseData.spriteKey) {
+      this.enemyCombatant.sprite.setTexture(phaseData.spriteKey);
+    }
+
+    // Change music for new phase
+    this.playPhaseMusic(phaseNumber);
+
+    // Change background if specified
+    if (phaseData.backgroundKey) {
+      this.tweens.add({
+        targets: this.background,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          if (this.background && phaseData.backgroundKey) {
+            this.background.setTexture(phaseData.backgroundKey);
+            // Re-apply full canvas scaling for new texture
+            this.background.setDisplaySize(400, 850);
+            this.tweens.add({
+              targets: this.background,
+              alpha: 1,
+              duration: 500,
+            });
+          }
+        },
+      });
+      await this.delay(1000);
+    }
+
+    // Camera shake
+    this.cameras.main.shake(500, 0.01);
+    await this.delay(500);
+
+    // Show phase name
+    this.messageLog.addMessage(`Phase ${phaseNumber}: ${phaseData.name}!`, 'effect');
+    await this.delay(1500);
+  }
+
+  /**
+   * Update boss UI after phase transition
+   */
+  private updateBossUI(phaseData: BossPhaseData): void {
+    // Update health bar with new max HP
+    // Note: HealthBarUI may need to be recreated or have methods added for dynamic max HP
+    // For now, just update the current HP
+    this.enemyHealthBar.setHP(phaseData.baseStats.maxHP);
+
+    // TODO: Update boss name label if HealthBarUI supports it
+    // this.enemyHealthBar.updateLabel(this.enemyCombatant.name);
   }
 
   /**
@@ -1296,6 +1846,18 @@ export default class BattleScene extends Phaser.Scene {
   private onVictory(): void {
     this.actionMenu.setVisible(false);
     this.skillMenu.setVisible(false);
+
+    // Fade out music
+    if (this.battleMusic && this.battleMusic.isPlaying) {
+      this.tweens.add({
+        targets: this.battleMusic,
+        volume: 0,
+        duration: 2000,
+        onComplete: () => {
+          this.battleMusic?.stop();
+        },
+      });
+    }
 
     this.messageLog.addMessage(
       `${this.enemyCombatant.name} was defeated!`,
@@ -1327,8 +1889,20 @@ export default class BattleScene extends Phaser.Scene {
     this.actionMenu.setVisible(false);
     this.skillMenu.setVisible(false);
 
+    // Fade out music
+    if (this.battleMusic && this.battleMusic.isPlaying) {
+      this.tweens.add({
+        targets: this.battleMusic,
+        volume: 0,
+        duration: 2000,
+        onComplete: () => {
+          this.battleMusic?.stop();
+        },
+      });
+    }
+
     this.messageLog.addMessage(
-      `${this.playerCombatant.name} fainted!`,
+      'All your pets fainted!',
       'info'
     );
 
@@ -1366,18 +1940,91 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   /**
-   * Utility delay function
+   * Get stat stage multiplier
+   */
+  private getStatMultiplier(stage: number): number {
+    const clampedStage = Math.max(-6, Math.min(6, stage));
+    const key = clampedStage.toString() as keyof typeof BATTLE_CONFIG.STAT_STAGE_MULTIPLIERS;
+    return BATTLE_CONFIG.STAT_STAGE_MULTIPLIERS[key];
+  }
+
+  /**
+   * Utility delay function with click-to-skip support
    */
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => {
-      this.time.delayedCall(ms, () => resolve());
+      // If skip flag is set, resolve immediately
+      if (this.skipDelay) {
+        this.skipDelay = false; // Reset flag
+        resolve();
+        return;
+      }
+
+      // Set up click listener to skip this specific delay
+      const skipListener = () => {
+        this.skipDelay = false;
+        this.input.off('pointerdown', skipListener);
+        resolve();
+      };
+
+      this.input.once('pointerdown', skipListener);
+
+      // Also resolve after the delay time
+      this.time.delayedCall(ms, () => {
+        this.input.off('pointerdown', skipListener);
+        resolve();
+      });
     });
+  }
+
+  /**
+   * Play phase-specific battle music
+   */
+  private playPhaseMusic(phaseNumber: number): void {
+    // Stop current music if playing
+    if (this.battleMusic) {
+      this.battleMusic.stop();
+    }
+
+    // Select music key based on phase
+    let musicKey = '';
+    switch (phaseNumber) {
+      case 1:
+        musicKey = 'battle-music-phase-1';
+        break;
+      case 2:
+        musicKey = 'battle-music-phase-2';
+        break;
+      case 3:
+        musicKey = 'battle-music-phase-3';
+        break;
+      default:
+        musicKey = 'battle-music-phase-1';
+    }
+
+    // Play new music with loop
+    try {
+      this.battleMusic = this.sound.add(musicKey, {
+        volume: 0.6,
+        loop: true,
+      });
+      this.battleMusic.play();
+      console.log(`Playing Phase ${phaseNumber} music: ${musicKey}`);
+    } catch (error) {
+      console.error('Failed to play battle music:', error);
+    }
   }
 
   /**
    * Cleanup
    */
   shutdown(): void {
+    // Stop and cleanup music
+    if (this.battleMusic) {
+      this.battleMusic.stop();
+      this.battleMusic.destroy();
+    }
+
     this.actionButtons = [];
     this.skillCards = [];
   }
