@@ -22,10 +22,10 @@ const config: Phaser.Types.Core.GameConfig = {
   backgroundColor: '#FDF6E3', // Match primary-bg color from Tailwind config
   scene: [
     // ⚠️ DEBUG MODE: Starting with DungeonMapScene
+    DungeonMapScene, // TEMP: Default starting scene for debugging positions
     MainScene, // ORIGINAL: Default starting scene - displays room background
     BottomNavScene, // UI overlay scene - will be launched by MainScene
     LoadingScene, // Loading scene for dungeon transitions
-    DungeonMapScene, // TEMP: Default starting scene for debugging positions
     BattleScene, // Battle arena scene for turn-based combat
   ],
   physics: {
