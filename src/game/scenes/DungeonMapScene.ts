@@ -75,7 +75,7 @@ export default class DungeonMapScene extends Phaser.Scene {
     const level1Pos = LEVEL_POSITIONS.find(pos => pos.level === 1);
     if (level1Pos) {
       const scaledLevel1Y = level1Pos.y * bgScale;
-      const gapFromTop = 100; // 100px gap from top edge
+      const gapFromTop = 200; // 300px gap from top edge (more space above level 1)
       const targetScrollY = Math.max(0, scaledLevel1Y - gapFromTop);
 
       // Wait 500ms to show background, then smoothly scroll to level 1
@@ -93,7 +93,7 @@ export default class DungeonMapScene extends Phaser.Scene {
     }
 
     // Create back button (fixed to camera)
-    this.createBackButton();
+    // this.createBackButton();
 
     // Set up touch drag scrolling
     this.setupScrolling();
@@ -123,22 +123,23 @@ export default class DungeonMapScene extends Phaser.Scene {
 	  }
 
       // Add appropriate icon based on level and lock status
+      // Level 2 button now appears at level 1 position, old level 2 position is locked
       let icon: Phaser.GameObjects.Image;
       if (levelPos.level === 1) {
-        icon = this.add.image(0, 0, 'level-1-icon');
-        icon.setScale(0.2); // 500 * 0.11 ≈ 55px
-      } else if (levelPos.level === 2) {
+        // Show level 2 icon at level 1 position
         icon = this.add.image(0, 0, 'level-2-icon');
-        icon.setScale(0.085); // 500 * 0.11 ≈ 55px
+        icon.setScale(0.085);
       } else {
-        // Levels 3-10: locked
+        // All other levels are locked (including old level 2 position)
         icon = this.add.image(0, 0, 'lock-icon');
-        icon.setScale(0.08); // Adjust for lock icon size
+        icon.setScale(0.08);
       }
       container.add(icon);
 
       // Add level name text (positioned below node frame)
-      const levelText = this.add.text(0, 45, levelPos.name, {
+      // Show "Greasy Swamp" at level 1 position
+      const displayName = levelPos.level === 1 ? 'Greasy Swamp' : levelPos.name;
+      const levelText = this.add.text(0, 45, displayName, {
         fontFamily: 'Nunito, sans-serif',
         fontSize: '10px',
         color: '#FFFFFF',
@@ -158,7 +159,8 @@ export default class DungeonMapScene extends Phaser.Scene {
 
       // Add click handler
       container.on('pointerdown', () => {
-        const isLocked = levelPos.level > 2; // Levels 3-10 are locked
+        // Only level 1 position is unlocked (which launches level 2 battle)
+        const isLocked = levelPos.level !== 1;
         console.log('=== Level Node Clicked ===');
         console.log(`Level: ${levelPos.level}`);
         console.log(`Name: ${levelPos.name}`);
@@ -166,12 +168,12 @@ export default class DungeonMapScene extends Phaser.Scene {
         console.log(`Locked: ${isLocked}`);
         console.log('========================');
 
-        // Launch battle for Level 2
-        if (levelPos.level === 2 && !isLocked) {
+        // Launch battle for Level 2 when clicking level 1 position
+        if (levelPos.level === 1) {
           console.log('Launching Battle Scene for Level 2');
           this.scene.start('BattleScene', {
-            level: levelPos.level,
-            levelName: levelPos.name,
+            level: 2,
+            levelName: 'Greasy Swamp',
             previousScene: 'DungeonMapScene',
           });
         } else if (isLocked) {

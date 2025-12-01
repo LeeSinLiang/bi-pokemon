@@ -131,15 +131,15 @@ export default class BattleScene extends Phaser.Scene {
     // Load battle music for each phase
     this.load.audio(
       'battle-music-phase-1',
-      '/assets/dungeon/battle/ost/Byte In Intro Phase 1.m4a'
+      '/assets/dungeon/battle/ost/Phase 1 cute.mp3'
     );
     this.load.audio(
       'battle-music-phase-2',
-      '/assets/dungeon/battle/ost/Byte In Battle Phase 2.mp3'
+      '/assets/dungeon/battle/ost/Phase 2 cute.mp3'
     );
     this.load.audio(
       'battle-music-phase-3',
-      '/assets/dungeon/battle/ost/Byte In Phase 3 Ending.mp3'
+      '/assets/dungeon/battle/ost/Phase 3 cute.mp3'
     );
   }
 
