@@ -128,18 +128,32 @@ export default class BattleScene extends Phaser.Scene {
       '/assets/dungeon/battle/enemies/serpent-damage.png'
     );
 
-    // Load battle music for each phase
+    // Load battle music for each phase - Cute theme
     this.load.audio(
-      'battle-music-phase-1',
+      'battle-music-phase-1-cute',
       '/assets/dungeon/battle/ost/Phase 1 cute.mp3'
     );
     this.load.audio(
-      'battle-music-phase-2',
+      'battle-music-phase-2-cute',
       '/assets/dungeon/battle/ost/Phase 2 cute.mp3'
     );
     this.load.audio(
-      'battle-music-phase-3',
+      'battle-music-phase-3-cute',
       '/assets/dungeon/battle/ost/Phase 3 cute.mp3'
+    );
+
+    // Load battle music for each phase - Rock theme
+    this.load.audio(
+      'battle-music-phase-1-rock',
+      '/assets/dungeon/battle/ost/Byte In Intro Phase 1.m4a'
+    );
+    this.load.audio(
+      'battle-music-phase-2-rock',
+      '/assets/dungeon/battle/ost/Byte In Battle Phase 2.mp3'
+    );
+    this.load.audio(
+      'battle-music-phase-3-rock',
+      '/assets/dungeon/battle/ost/Byte In Phase 3 Ending.mp3'
     );
   }
 
@@ -1986,20 +2000,24 @@ export default class BattleScene extends Phaser.Scene {
       this.battleMusic.stop();
     }
 
-    // Select music key based on phase
+    // Get theme preference from registry (default to 'cute' for backward compatibility)
+    const theme = this.registry.get('battleMusicTheme') || 'cute';
+    const themeSuffix = theme === 'rock' ? '-rock' : '-cute';
+
+    // Select music key based on phase and theme
     let musicKey = '';
     switch (phaseNumber) {
       case 1:
-        musicKey = 'battle-music-phase-1';
+        musicKey = `battle-music-phase-1${themeSuffix}`;
         break;
       case 2:
-        musicKey = 'battle-music-phase-2';
+        musicKey = `battle-music-phase-2${themeSuffix}`;
         break;
       case 3:
-        musicKey = 'battle-music-phase-3';
+        musicKey = `battle-music-phase-3${themeSuffix}`;
         break;
       default:
-        musicKey = 'battle-music-phase-1';
+        musicKey = `battle-music-phase-1${themeSuffix}`;
     }
 
     // Play new music with loop
@@ -2009,7 +2027,7 @@ export default class BattleScene extends Phaser.Scene {
         loop: true,
       });
       this.battleMusic.play();
-      console.log(`Playing Phase ${phaseNumber} music: ${musicKey}`);
+      console.log(`Playing Phase ${phaseNumber} music: ${musicKey} (theme: ${theme})`);
     } catch (error) {
       console.error('Failed to play battle music:', error);
     }

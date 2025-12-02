@@ -19,6 +19,9 @@ export default class DungeonMapScene extends Phaser.Scene {
   private scrollVelocity = 0;
   private background!: Phaser.GameObjects.Image;
   private levelNodes: Phaser.GameObjects.Container[] = [];
+  private musicThemeButton?: Phaser.GameObjects.Container;
+  private musicThemeIndicator?: Phaser.GameObjects.Graphics;
+  private musicThemeLabels?: { rock: Phaser.GameObjects.Text; cute: Phaser.GameObjects.Text };
 
   // Constants
   private readonly GAME_WIDTH = 400;
@@ -49,6 +52,11 @@ export default class DungeonMapScene extends Phaser.Scene {
    * Create the dungeon map scene
    */
   create(): void {
+    // Set default music theme if not already set
+    if (!this.registry.has('battleMusicTheme')) {
+      this.registry.set('battleMusicTheme', 'rock');
+    }
+
     // Calculate background scale to fit 400px width
     const bgScale = this.GAME_WIDTH / this.BG_WIDTH; // 400 / 512 ≈ 0.78125
     const scaledBgHeight = this.BG_HEIGHT * bgScale; // 2048 * 0.78125 = 1600
@@ -94,6 +102,9 @@ export default class DungeonMapScene extends Phaser.Scene {
 
     // Create back button (fixed to camera)
     // this.createBackButton();
+
+    // Create music theme toggle button (fixed to camera)
+    this.createMusicThemeButton();
 
     // Set up touch drag scrolling
     this.setupScrolling();
@@ -278,6 +289,180 @@ export default class DungeonMapScene extends Phaser.Scene {
       bg.lineStyle(2, 0x8D6E63, 1);
       bg.strokeRoundedRect(0, 0, 80, 36, 18);
     });
+  }
+
+  /**
+   * Create music theme toggle button (slider style)
+   * Left side = Rock (default), Right side = Cute
+   */
+  private createMusicThemeButton(): void {
+    // Create slider track background (pill shape) - bigger size
+    const trackWidth = 140;
+    const trackHeight = 46;
+    const trackRadius = 23;
+
+    // Position at top-right corner
+    const buttonX = 400 - trackWidth - 10; // 10px padding from right edge
+    const buttonY = 16;
+
+    // Create container for the entire button
+    this.musicThemeButton = this.add.container(buttonX, buttonY);
+    this.musicThemeButton.setScrollFactor(0); // Fix to camera
+    this.musicThemeButton.setDepth(1000); // Ensure it's on top
+
+    const track = this.add.graphics();
+    track.fillStyle(0x5D4037, 0.9);
+    track.fillRoundedRect(0, 0, trackWidth, trackHeight, trackRadius);
+    track.lineStyle(2, 0x8D6E63, 1);
+    track.strokeRoundedRect(0, 0, trackWidth, trackHeight, trackRadius);
+    this.musicThemeButton.add(track);
+
+    // Create sliding indicator (half width of track)
+    this.musicThemeIndicator = this.add.graphics();
+    this.musicThemeButton.add(this.musicThemeIndicator);
+
+    // Create labels - centered in each half
+    const rockLabel = this.add.text(trackWidth / 4, trackHeight / 2, 'Rock', {
+      fontFamily: 'Nunito, sans-serif',
+      fontSize: '14px',
+      color: '#FFFFFF',
+      fontStyle: 'bold',
+      align: 'center'
+    });
+    rockLabel.setOrigin(0.5, 0.5);
+
+    const cuteLabel = this.add.text((trackWidth * 3) / 4, trackHeight / 2, 'Cute', {
+      fontFamily: 'Nunito, sans-serif',
+      fontSize: '14px',
+      color: '#CCCCCC',
+      fontStyle: 'normal',
+      align: 'center'
+    });
+    cuteLabel.setOrigin(0.5, 0.5);
+
+    this.musicThemeLabels = { rock: rockLabel, cute: cuteLabel };
+    this.musicThemeButton.add([rockLabel, cuteLabel]);
+
+    // Draw initial indicator position (rock = left)
+    const currentTheme = this.registry.get('battleMusicTheme') || 'rock';
+    this.updateMusicThemeIndicator(currentTheme === 'rock' ? 'rock' : 'cute', false);
+
+    // Create transparent hit box - same pattern as ActionButtonUI
+    const hitBox = this.add.rectangle(
+      trackWidth / 2,
+      trackHeight / 2,
+      trackWidth,
+      trackHeight,
+      0x000000,
+      0.01
+    );
+    hitBox.setInteractive({ useHandCursor: true });
+    this.musicThemeButton.add(hitBox);
+    this.musicThemeButton.sendToBack(hitBox);
+
+    // IMPORTANT: hitBox must also ignore camera scroll to work when scrolled
+    // Even though it's in a container with scrollFactor(0), the hit detection needs this
+    hitBox.setScrollFactor(0);
+
+    // Add click handler
+    hitBox.on('pointerdown', () => {
+      this.toggleMusicTheme();
+    });
+
+    // Add hover effects
+    hitBox.on('pointerover', () => {
+      this.input.setDefaultCursor('pointer');
+      if (this.musicThemeButton) {
+        this.tweens.killTweensOf(this.musicThemeButton);
+        this.tweens.add({
+          targets: this.musicThemeButton,
+          scale: 1.05,
+          duration: 150,
+          ease: 'Power2'
+        });
+      }
+    });
+
+    hitBox.on('pointerout', () => {
+      this.input.setDefaultCursor('default');
+      if (this.musicThemeButton) {
+        this.tweens.killTweensOf(this.musicThemeButton);
+        this.tweens.add({
+          targets: this.musicThemeButton,
+          scale: 1.0,
+          duration: 150,
+          ease: 'Power2'
+        });
+      }
+    });
+  }
+
+  /**
+   * Toggle between rock and cute music themes
+   */
+  private toggleMusicTheme(): void {
+    const currentTheme = this.registry.get('battleMusicTheme') || 'rock';
+    const newTheme = currentTheme === 'rock' ? 'cute' : 'rock';
+
+    // Update registry
+    this.registry.set('battleMusicTheme', newTheme);
+
+    // Update visual indicator with animation
+    this.updateMusicThemeIndicator(newTheme, true);
+
+    console.log(`Battle music theme changed to: ${newTheme}`);
+  }
+
+  /**
+   * Update the visual indicator and labels for the current theme
+   */
+  private updateMusicThemeIndicator(theme: 'rock' | 'cute', animate: boolean): void {
+    if (!this.musicThemeIndicator || !this.musicThemeLabels) return;
+
+    // Calculate indicator position (bigger dimensions)
+    const trackWidth = 140;
+    const indicatorWidth = 70; // Half of track width
+    const indicatorHeight = 42; // Slightly smaller than track (46 - 4)
+    const indicatorRadius = 21;
+    const indicatorY = 2; // 2px padding from top
+    const indicatorX = theme === 'rock' ? 2 : (trackWidth - indicatorWidth - 2); // Left or right with 2px padding
+
+    // Update indicator position
+    if (animate) {
+      // Animate the indicator slide
+      const duration = 200;
+      // Calculate start position (opposite of target)
+      const startX = theme === 'rock' ? (trackWidth - indicatorWidth - 2) : 2;
+
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: duration,
+        ease: 'Power2',
+        onUpdate: (tween) => {
+          const progress = tween.getValue() ?? 0;
+          const currentX = Phaser.Math.Linear(startX, indicatorX, progress);
+
+          this.musicThemeIndicator!.clear();
+          this.musicThemeIndicator!.fillStyle(0xFFB74D, 1); // Active orange
+          this.musicThemeIndicator!.fillRoundedRect(currentX, indicatorY, indicatorWidth, indicatorHeight, indicatorRadius);
+        }
+      });
+    } else {
+      // Immediate update without animation
+      this.musicThemeIndicator.clear();
+      this.musicThemeIndicator.fillStyle(0xFFB74D, 1); // Active orange
+      this.musicThemeIndicator.fillRoundedRect(indicatorX, indicatorY, indicatorWidth, indicatorHeight, indicatorRadius);
+    }
+
+    // Update label styles
+    if (theme === 'rock') {
+      this.musicThemeLabels.rock.setStyle({ color: '#FFFFFF', fontStyle: 'bold' });
+      this.musicThemeLabels.cute.setStyle({ color: '#CCCCCC', fontStyle: 'normal' });
+    } else {
+      this.musicThemeLabels.rock.setStyle({ color: '#CCCCCC', fontStyle: 'normal' });
+      this.musicThemeLabels.cute.setStyle({ color: '#FFFFFF', fontStyle: 'bold' });
+    }
   }
 
   /**
