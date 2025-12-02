@@ -22,6 +22,7 @@ export default class DungeonMapScene extends Phaser.Scene {
   private musicThemeButton?: Phaser.GameObjects.Container;
   private musicThemeIndicator?: Phaser.GameObjects.Graphics;
   private musicThemeLabels?: { rock: Phaser.GameObjects.Text; cute: Phaser.GameObjects.Text };
+  private dungeonMusic?: Phaser.Sound.BaseSound;
 
   // Constants
   private readonly GAME_WIDTH = 400;
@@ -46,6 +47,9 @@ export default class DungeonMapScene extends Phaser.Scene {
     this.load.image('level-2-icon', '/assets/dungeon/level-2-icon.png');
     this.load.image('lock-icon', '/assets/dungeon/lock-icon.png');
     this.load.image('star-icon', '/assets/dungeon/star-icon.png');
+
+    // Load dungeon map background music
+    this.load.audio('dungeon-map-music', '/assets/dungeon/ost/grove.mp3');
   }
 
   /**
@@ -109,6 +113,9 @@ export default class DungeonMapScene extends Phaser.Scene {
     // Set up touch drag scrolling
     this.setupScrolling();
 
+    // Start dungeon map background music
+    this.startDungeonMusic();
+
     console.log('DungeonMapScene created');
     console.log(`Background scaled height: ${scaledBgHeight}`);
     console.log(`Camera bounds: 0, 0, ${this.GAME_WIDTH}, ${scaledBgHeight}`);
@@ -169,7 +176,7 @@ export default class DungeonMapScene extends Phaser.Scene {
       container.setInteractive(hitArea, Phaser.Geom.Circle.Contains);
 
       // Add click handler
-      container.on('pointerdown', () => {
+      container.on('pointerdown', async () => {
         // Only level 1 position is unlocked (which launches level 2 battle)
         const isLocked = levelPos.level !== 1;
         console.log('=== Level Node Clicked ===');
@@ -182,6 +189,10 @@ export default class DungeonMapScene extends Phaser.Scene {
         // Launch battle for Level 2 when clicking level 1 position
         if (levelPos.level === 1) {
           console.log('Launching Battle Scene for Level 2');
+
+          // Fade out dungeon music before entering battle
+          await this.fadeDungeonMusic();
+
           this.scene.start('BattleScene', {
             level: 2,
             levelName: 'Greasy Swamp',
@@ -398,6 +409,49 @@ export default class DungeonMapScene extends Phaser.Scene {
   }
 
   /**
+   * Start dungeon map background music
+   */
+  private startDungeonMusic(): void {
+    // Stop any existing dungeon music
+    if (this.dungeonMusic) {
+      this.dungeonMusic.stop();
+    }
+
+    // Play dungeon map music with loop
+    try {
+      this.dungeonMusic = this.sound.add('dungeon-map-music', {
+        volume: 0.5,
+        loop: true,
+      });
+      this.dungeonMusic.play();
+      console.log('Dungeon map music started');
+    } catch (error) {
+      console.error('Failed to play dungeon map music:', error);
+    }
+  }
+
+  /**
+   * Fade out dungeon music (called before entering battle)
+   */
+  private fadeDungeonMusic(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.dungeonMusic && this.dungeonMusic.isPlaying) {
+        this.tweens.add({
+          targets: this.dungeonMusic,
+          volume: 0,
+          duration: 1000, // 1 second fade out
+          onComplete: () => {
+            this.dungeonMusic?.stop();
+            resolve();
+          },
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  /**
    * Toggle between rock and cute music themes
    */
   private toggleMusicTheme(): void {
@@ -517,6 +571,12 @@ export default class DungeonMapScene extends Phaser.Scene {
    * Cleanup when scene shuts down
    */
   shutdown(): void {
+    // Stop and cleanup dungeon music
+    if (this.dungeonMusic) {
+      this.dungeonMusic.stop();
+      this.dungeonMusic.destroy();
+    }
+
     this.levelNodes = [];
     this.isDragging = false;
     this.scrollVelocity = 0;
